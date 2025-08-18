@@ -98,27 +98,46 @@ const CFXStatusIndicator = () => {
       const link = latestEntry.querySelector('link')?.getAttribute('href') || '';
       const summary = latestEntry.querySelector('summary')?.textContent || '';
 
-      // Determine status based on title keywords
+      console.log('CFX Status Debug:', {
+        title,
+        updated,
+        entriesCount: entries.length,
+        titleLower: title.toLowerCase()
+      });
+
+      // Determine status based on title keywords and recency
       let overallStatus: CFXStatus['overallStatus'] = 'operational';
       const titleLower = title.toLowerCase();
       
-      if (titleLower.includes('resolved') || titleLower.includes('fixed')) {
+      // Check how recent the incident is
+      const incidentTime = new Date(updated);
+      const now = new Date();
+      const hoursDiff = (now.getTime() - incidentTime.getTime()) / (1000 * 60 * 60);
+      const daysDiff = hoursDiff / 24;
+      
+      console.log('CFX Time Analysis:', {
+        incidentTime: incidentTime.toISOString(),
+        now: now.toISOString(),
+        hoursDiff,
+        daysDiff
+      });
+      
+      // Only consider incidents from the last 24 hours as affecting current status
+      if (daysDiff > 1) {
+        // Incident is old, assume operational
         overallStatus = 'operational';
-      } else if (titleLower.includes('maintenance') || titleLower.includes('scheduled')) {
-        overallStatus = 'maintenance';
-      } else if (titleLower.includes('outage') || titleLower.includes('down')) {
-        overallStatus = 'outage';
-      } else if (titleLower.includes('degraded') || titleLower.includes('slow') || titleLower.includes('issue')) {
-        overallStatus = 'degraded';
       } else {
-        // If recent incident (within 6 hours), assume there might be issues
-        const incidentTime = new Date(updated);
-        const now = new Date();
-        const hoursDiff = (now.getTime() - incidentTime.getTime()) / (1000 * 60 * 60);
-        
-        if (hoursDiff < 6) {
+        // Recent incident, analyze the title
+        if (titleLower.includes('resolved') || titleLower.includes('fixed') || titleLower.includes('completed')) {
+          overallStatus = 'operational';
+        } else if (titleLower.includes('maintenance') || titleLower.includes('scheduled')) {
+          overallStatus = 'maintenance';
+        } else if (titleLower.includes('outage') || titleLower.includes('down')) {
+          overallStatus = 'outage';
+        } else if (titleLower.includes('degraded') || titleLower.includes('slow') || titleLower.includes('issue') || titleLower.includes('investigating')) {
           overallStatus = 'degraded';
         } else {
+          // Unknown recent incident type, default to operational
           overallStatus = 'operational';
         }
       }
