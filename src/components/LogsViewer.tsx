@@ -44,20 +44,38 @@ const LogsViewer = () => {
   const fetchLogs = async () => {
     setLoading(true);
     try {
+      console.log('🔍 Fetching logs from analytics...');
+      
       // Fetch logs in parallel
       const [authRes, dbRes, edgeRes] = await Promise.all([
         supabase.functions.invoke('fetch-analytics-logs', {
           body: { logType: 'auth', limit: 100 }
+        }).catch(err => {
+          console.error('Auth logs fetch failed:', err);
+          return { data: null, error: err };
         }),
         supabase.functions.invoke('fetch-analytics-logs', {
           body: { logType: 'database', limit: 100 }
+        }).catch(err => {
+          console.error('Database logs fetch failed:', err);
+          return { data: null, error: err };
         }),
         supabase.functions.invoke('fetch-analytics-logs', {
           body: { logType: 'functions', limit: 100 }
+        }).catch(err => {
+          console.error('Edge function logs fetch failed:', err);
+          return { data: null, error: err };
         })
       ]);
 
+      console.log('📊 Log fetch results:', {
+        auth: authRes,
+        database: dbRes,
+        edge: edgeRes
+      });
+
       // Process auth logs
+      console.log('📋 Processing auth logs:', authRes);
       if (authRes.data?.success && authRes.data?.data) {
         const processedAuthLogs = authRes.data.data.map((log: any) => ({
           id: log.id || `auth-${Date.now()}-${Math.random()}`,
@@ -72,10 +90,15 @@ const LogsViewer = () => {
           ip_address: log.ip_address,
           user_agent: log.user_agent
         }));
+        console.log('✅ Auth logs processed:', processedAuthLogs.length);
         setAuthLogs(processedAuthLogs);
+      } else {
+        console.log('❌ No auth logs data:', authRes.error || 'Unknown error');
+        setAuthLogs([]);
       }
 
-      // Process database logs
+      // Process database logs  
+      console.log('📋 Processing database logs:', dbRes);
       if (dbRes.data?.success && dbRes.data?.data) {
         const processedDbLogs = dbRes.data.data.map((log: any) => ({
           id: log.id || `db-${Date.now()}-${Math.random()}`,
@@ -89,10 +112,15 @@ const LogsViewer = () => {
           error_severity: log.error_severity,
           identifier: log.identifier
         }));
+        console.log('✅ Database logs processed:', processedDbLogs.length);
         setDbLogs(processedDbLogs);
+      } else {
+        console.log('❌ No database logs data:', dbRes.error || 'Unknown error');
+        setDbLogs([]);
       }
 
       // Process edge function logs
+      console.log('📋 Processing edge function logs:', edgeRes);
       if (edgeRes.data?.success && edgeRes.data?.data) {
         const processedEdgeLogs = edgeRes.data.data.map((log: any) => ({
           id: log.id || `edge-${Date.now()}-${Math.random()}`,
@@ -107,7 +135,11 @@ const LogsViewer = () => {
           function_id: log.function_id,
           execution_time: log.execution_time_ms
         }));
+        console.log('✅ Edge function logs processed:', processedEdgeLogs.length);
         setEdgeLogs(processedEdgeLogs);
+      } else {
+        console.log('❌ No edge function logs data:', edgeRes.error || 'Unknown error');
+        setEdgeLogs([]);
       }
 
     } catch (error) {

@@ -126,6 +126,7 @@ const CFXStatusIndicator = () => {
       if (daysDiff > 1) {
         // Incident is old, assume operational
         overallStatus = 'operational';
+        console.log('CFX Status: Incident is old (>24h), setting to operational');
       } else {
         // Recent incident, analyze the title
         if (titleLower.includes('resolved') || titleLower.includes('fixed') || titleLower.includes('completed')) {
