@@ -1,0 +1,235 @@
+import { useState, useEffect } from 'react';
+import { AlertTriangle, CheckCircle, XCircle, Clock } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
+
+interface StatusEntry {
+  title: string;
+  updated: string;
+  link: string;
+  summary: string;
+}
+
+interface CFXStatus {
+  overallStatus: 'operational' | 'degraded' | 'outage' | 'maintenance' | 'unknown';
+  lastIncident?: StatusEntry;
+  lastUpdated: string;
+}
+
+const CFXStatusIndicator = () => {
+  const [status, setStatus] = useState<CFXStatus>({
+    overallStatus: 'unknown',
+    lastUpdated: '',
+  });
+  const [isLoading, setIsLoading] = useState(false);
+
+  const fetchStatus = async () => {
+    setIsLoading(true);
+    try {
+      // Use a CORS proxy to fetch the atom feed
+      const proxyUrl = 'https://api.allorigins.win/raw?url=';
+      const response = await fetch(`${proxyUrl}${encodeURIComponent('https://status.cfx.re/history.atom')}`);
+      const xmlText = await response.text();
+      
+      // Parse XML
+      const parser = new DOMParser();
+      const xmlDoc = parser.parseFromString(xmlText, 'text/xml');
+      
+      const entries = xmlDoc.querySelectorAll('entry');
+      const feedUpdated = xmlDoc.querySelector('updated')?.textContent || '';
+      
+      if (entries.length === 0) {
+        // No incidents, assume operational
+        setStatus({
+          overallStatus: 'operational',
+          lastUpdated: feedUpdated,
+        });
+        return;
+      }
+
+      // Get the most recent entry
+      const latestEntry = entries[0];
+      const title = latestEntry.querySelector('title')?.textContent || '';
+      const updated = latestEntry.querySelector('updated')?.textContent || '';
+      const link = latestEntry.querySelector('link')?.getAttribute('href') || '';
+      const summary = latestEntry.querySelector('summary')?.textContent || '';
+
+      // Determine status based on title keywords
+      let overallStatus: CFXStatus['overallStatus'] = 'unknown';
+      const titleLower = title.toLowerCase();
+      
+      if (titleLower.includes('resolved') || titleLower.includes('fixed')) {
+        overallStatus = 'operational';
+      } else if (titleLower.includes('maintenance') || titleLower.includes('scheduled')) {
+        overallStatus = 'maintenance';
+      } else if (titleLower.includes('outage') || titleLower.includes('down')) {
+        overallStatus = 'outage';
+      } else if (titleLower.includes('degraded') || titleLower.includes('slow') || titleLower.includes('issue')) {
+        overallStatus = 'degraded';
+      } else {
+        // If recent incident (within 24 hours), assume there might be issues
+        const incidentTime = new Date(updated);
+        const now = new Date();
+        const hoursDiff = (now.getTime() - incidentTime.getTime()) / (1000 * 60 * 60);
+        
+        if (hoursDiff < 24) {
+          overallStatus = 'degraded';
+        } else {
+          overallStatus = 'operational';
+        }
+      }
+
+      setStatus({
+        overallStatus,
+        lastIncident: { title, updated, link, summary },
+        lastUpdated: feedUpdated,
+      });
+    } catch (error) {
+      console.error('Failed to fetch CFX status:', error);
+      setStatus({
+        overallStatus: 'unknown',
+        lastUpdated: new Date().toISOString(),
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchStatus();
+    // Refresh every 5 minutes
+    const interval = setInterval(fetchStatus, 5 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const getStatusIcon = () => {
+    if (isLoading) return <Clock className="h-4 w-4 animate-spin" />;
+    
+    switch (status.overallStatus) {
+      case 'operational':
+        return <CheckCircle className="h-4 w-4 text-green-500" />;
+      case 'degraded':
+        return <AlertTriangle className="h-4 w-4 text-yellow-500" />;
+      case 'outage':
+        return <XCircle className="h-4 w-4 text-red-500" />;
+      case 'maintenance':
+        return <Clock className="h-4 w-4 text-blue-500" />;
+      default:
+        return <AlertTriangle className="h-4 w-4 text-gray-500" />;
+    }
+  };
+
+  const getStatusText = () => {
+    switch (status.overallStatus) {
+      case 'operational':
+        return 'CFX Operational';
+      case 'degraded':
+        return 'CFX Issues';
+      case 'outage':
+        return 'CFX Outage';
+      case 'maintenance':
+        return 'CFX Maintenance';
+      default:
+        return 'CFX Status Unknown';
+    }
+  };
+
+  const getStatusColor = () => {
+    switch (status.overallStatus) {
+      case 'operational':
+        return 'text-green-500';
+      case 'degraded':
+        return 'text-yellow-500';
+      case 'outage':
+        return 'text-red-500';
+      case 'maintenance':
+        return 'text-blue-500';
+      default:
+        return 'text-gray-500';
+    }
+  };
+
+  const formatDate = (dateString: string) => {
+    try {
+      return new Date(dateString).toLocaleString();
+    } catch {
+      return dateString;
+    }
+  };
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button 
+          variant="ghost" 
+          size="sm" 
+          className="flex items-center space-x-2 hover:bg-gaming-card/50"
+        >
+          {getStatusIcon()}
+          <span className={`text-sm font-medium ${getStatusColor()}`}>
+            {getStatusText()}
+          </span>
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent 
+        className="w-80 bg-gaming-card border-gaming-border shadow-lg z-[100]" 
+        align="end"
+      >
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h4 className="font-semibold text-foreground">CFX Status</h4>
+            <a
+              href="https://status.cfx.re"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm text-neon-purple hover:text-neon-pink transition-colors"
+            >
+              View Full Status
+            </a>
+          </div>
+          
+          <div className="flex items-center space-x-2">
+            {getStatusIcon()}
+            <span className={`font-medium ${getStatusColor()}`}>
+              {getStatusText()}
+            </span>
+          </div>
+
+          {status.lastIncident && (
+            <div className="space-y-2 pt-2 border-t border-gaming-border">
+              <h5 className="text-sm font-medium text-foreground">Latest Update:</h5>
+              <div className="space-y-1">
+                <p className="text-sm text-muted-foreground">
+                  {status.lastIncident.title}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {formatDate(status.lastIncident.updated)}
+                </p>
+                {status.lastIncident.link && (
+                  <a
+                    href={status.lastIncident.link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-neon-purple hover:text-neon-pink transition-colors"
+                  >
+                    View Details →
+                  </a>
+                )}
+              </div>
+            </div>
+          )}
+
+          <div className="text-xs text-muted-foreground pt-2 border-t border-gaming-border">
+            Last checked: {formatDate(status.lastUpdated)}
+          </div>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+};
+
+export default CFXStatusIndicator;

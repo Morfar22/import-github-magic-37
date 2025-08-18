@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import CFXStatusIndicator from "@/components/CFXStatusIndicator";
 
 const Navbar = () => {
   const { user, signOut } = useAuth();
@@ -199,6 +200,9 @@ const Navbar = () => {
                   <NavLinks />
                 </div>
                 <div className="border-t border-gaming-border pt-6">
+                  <CFXStatusIndicator />
+                </div>
+                <div className="border-t border-gaming-border pt-6">
                   <UserSection />
                 </div>
               </div>
@@ -224,6 +228,7 @@ const Navbar = () => {
         </div>
         
         <div className="flex items-center space-x-4">
+          <CFXStatusIndicator />
           <UserSection />
         </div>
       </div>
