@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Email Function</title>
+</head>
+<body>
+    <h1>Test Your Email Setup</h1>
+    <form id="emailForm">
+        <label>Email to test:</label>
+        <input type="email" id="testEmail" placeholder="your@email.com" required>
+        <button type="submit">Send Test Email</button>
+    </form>
+    <div id="result"></div>
+
+    <script>
+        document.getElementById('emailForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('testEmail').value;
+            const resultDiv = document.getElementById('result');
+            
+            try {
+                const response = await fetch('https://ganubwsifvjraqsawccl.supabase.co/functions/v1/test-email', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ testEmail: email })
+                });
+                
+                const result = await response.json();
+                resultDiv.innerHTML = `<p style="color: ${result.success ? 'green' : 'red'}">${JSON.stringify(result, null, 2)}</p>`;
+            } catch (error) {
+                resultDiv.innerHTML = `<p style="color: red">Error: ${error.message}</p>`;
+            }
+        });
+    </script>
+</body>
+</html>
