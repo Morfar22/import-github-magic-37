@@ -9,9 +9,13 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Search, Ban, Shield, Trash2, Eye, Mail, Calendar, Clock, UserX, CheckCircle, AlertTriangle } from "lucide-react";
+import { Search, Ban, Shield, Trash2, Eye, Mail, Calendar, Clock, UserX, CheckCircle, AlertTriangle, Edit2, Save, X } from "lucide-react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import ActiveUsersTracker from "./ActiveUsersTracker";
 
 const UserManagementSection = () => {
@@ -65,42 +69,67 @@ const UserManagementSection = () => {
     }
   };
 
-  const handleBanUser = async (userId: string, reason: string) => {
+const handleBanUser = async (user: any, reason: string) => {
+  if (!user || !user.email) {
+    toast({
+      title: "Error",
+      description: "Could not send ban notification: user or user email missing.",
+      variant: "destructive",
+    });
+    console.error("handleBanUser called with:", user, reason);
+    return;
+  }
+
+  try {
+    // Always get staff info for both DB and notification
+    const staff = await supabase.auth.getUser();
+    const staffId = staff.data.user?.id; // UUID for banned_by DB column
+    const staffDisplayName =
+      staff.data.user?.email ||
+      "Unknown Staff";
+
+    // Mark user as banned in your profiles table (use UUID!)
+    const { error } = await supabase
+      .from('profiles')
+      .update({ 
+        banned: true, 
+        banned_at: new Date().toISOString(),
+        banned_by: staffId // <-- UUID, never display name/email
+      })
+      .eq('id', user.id);
+
+    if (error) throw error;
+
+    // Send ban notification via edge function – use name/email for email template
     try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({ 
-          banned: true, 
-          banned_at: new Date().toISOString(),
-          banned_by: (await supabase.auth.getUser()).data.user?.id
-        })
-        .eq('id', userId);
-
-      if (error) throw error;
-
-      // Send ban notification via edge function
-      try {
-        await supabase.functions.invoke('send-ban-notification', {
-          body: { userId, reason }
-        });
-      } catch (fnError) {
-        console.warn('Failed to send ban notification:', fnError);
-      }
-
-      await fetchUsers();
-      toast({
-        title: "Success",
-        description: "User has been banned successfully",
+      await supabase.functions.invoke('send-ban-notification', {
+        body: {
+          userEmail: user.email,
+          userName: user.username,
+          isBanned: true,
+          banReason: reason,
+          staffName: staffDisplayName // display name/email for notification only
+        }
       });
-    } catch (error) {
-      console.error('Error banning user:', error);
-      toast({
-        title: "Error",
-        description: "Failed to ban user",
-        variant: "destructive",
-      });
+    } catch (fnError) {
+      console.warn('Failed to send ban notification:', fnError);
     }
-  };
+
+    await fetchUsers();
+    toast({
+      title: "Success",
+      description: "User has been banned successfully",
+    });
+  } catch (error) {
+    console.error('Error banning user:', error);
+    toast({
+      title: "Error",
+      description: "Failed to ban user",
+      variant: "destructive",
+    });
+  }
+};
+
 
   const handleUnbanUser = async (userId: string) => {
     try {
@@ -154,27 +183,62 @@ const UserManagementSection = () => {
     }
   };
 
-  const resetUserPassword = async (userId: string, email: string) => {
-    try {
-      const { error } = await supabase.functions.invoke('reset-user-password', {
-        body: { userId, email }
-      });
+const resetUserPassword = async (userId: string, email: string) => {
+  try {
+    // Send ONLY userEmail, not userId or email
+    const { error } = await supabase.functions.invoke('reset-user-password', {
+      body: { userEmail: email }
+    });
 
-      if (error) throw error;
+    if (error) throw error;
 
-      toast({
-        title: "Success",
-        description: "Password reset email sent successfully",
-      });
-    } catch (error) {
-      console.error('Error resetting password:', error);
-      toast({
-        title: "Error",
-        description: "Failed to send password reset email",
-        variant: "destructive",
-      });
-    }
-  };
+    toast({
+      title: "Success",
+      description: "Password reset email sent successfully",
+    });
+  } catch (error) {
+    console.error('Error resetting password:', error);
+    toast({
+      title: "Error",
+      description: "Failed to send password reset email",
+      variant: "destructive",
+    });
+  }
+};
+
+const userEditSchema = z.object({
+  username: z.string().min(1, "Username is required").max(50, "Username must be less than 50 characters"),
+  full_name: z.string().max(100, "Full name must be less than 100 characters").optional(),
+});
+
+const handleUpdateUser = async (userId: string, data: z.infer<typeof userEditSchema>) => {
+  try {
+    const { error } = await supabase
+      .from('profiles')
+      .update({
+        username: data.username,
+        full_name: data.full_name || null,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', userId);
+
+    if (error) throw error;
+
+    await fetchUsers();
+    toast({
+      title: "Success",
+      description: "User updated successfully",
+    });
+  } catch (error) {
+    console.error('Error updating user:', error);
+    toast({
+      title: "Error", 
+      description: "Failed to update user",
+      variant: "destructive",
+    });
+  }
+};
+
 
   const filteredUsers = users.filter(user => {
     const matchesSearch = !searchTerm || 
@@ -202,6 +266,135 @@ const UserManagementSection = () => {
       return <Badge className="bg-blue-500/20 text-blue-400 border-blue-500/30">Moderator</Badge>;
     }
     return <Badge variant="outline">User</Badge>;
+  };
+
+  const UserEditDialog = ({ user, onUserUpdate }: { user: any; onUserUpdate: () => void }) => {
+    const [isEditing, setIsEditing] = useState(false);
+    
+    const form = useForm<z.infer<typeof userEditSchema>>({
+      resolver: zodResolver(userEditSchema),
+      defaultValues: {
+        username: user?.username || "",
+        full_name: user?.full_name || "",
+      },
+    });
+
+    const onSubmit = async (data: z.infer<typeof userEditSchema>) => {
+      await handleUpdateUser(user.id, data);
+      setIsEditing(false);
+      onUserUpdate();
+    };
+
+    const handleCancel = () => {
+      form.reset({
+        username: user?.username || "",
+        full_name: user?.full_name || "",
+      });
+      setIsEditing(false);
+    };
+
+    if (!user) return null;
+
+    return (
+      <DialogContent className="bg-gaming-card border-gaming-border max-w-md">
+        <DialogHeader>
+          <DialogTitle className="text-foreground flex items-center justify-between">
+            User Details
+            {!isEditing && (
+              <Button variant="outline" size="sm" onClick={() => setIsEditing(true)}>
+                <Edit2 className="h-4 w-4" />
+              </Button>
+            )}
+          </DialogTitle>
+          <DialogDescription className="text-muted-foreground">
+            {isEditing ? "Edit user information" : "View and manage user information"}
+          </DialogDescription>
+        </DialogHeader>
+        
+        {isEditing ? (
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              <FormField
+                control={form.control}
+                name="username"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-foreground">Username</FormLabel>
+                    <FormControl>
+                      <Input 
+                        {...field} 
+                        className="bg-gaming-dark border-gaming-border text-foreground"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <FormField
+                control={form.control}
+                name="full_name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-foreground">Full Name</FormLabel>
+                    <FormControl>
+                      <Input 
+                        {...field} 
+                        className="bg-gaming-dark border-gaming-border text-foreground"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <div>
+                <Label className="text-foreground">Email</Label>
+                <p className="text-sm text-muted-foreground break-all">{user.email} (read-only)</p>
+              </div>
+              
+              <div className="flex justify-end space-x-2">
+                <Button type="button" variant="outline" onClick={handleCancel}>
+                  <X className="h-4 w-4 mr-2" />
+                  Cancel
+                </Button>
+                <Button type="submit">
+                  <Save className="h-4 w-4 mr-2" />
+                  Save
+                </Button>
+              </div>
+            </form>
+          </Form>
+        ) : (
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <Label className="text-foreground">Username</Label>
+                <p className="text-sm text-muted-foreground">{user.username || 'Not set'}</p>
+              </div>
+              <div>
+                <Label className="text-foreground">Email</Label>
+                <p className="text-sm text-muted-foreground break-all">{user.email}</p>
+              </div>
+              <div>
+                <Label className="text-foreground">Full Name</Label>
+                <p className="text-sm text-muted-foreground">{user.full_name || 'Not set'}</p>
+              </div>
+            </div>
+            
+            <div className="flex justify-end space-x-2">
+              <Button
+                variant="outline"
+                onClick={() => resetUserPassword(user.id, user.email)}
+                size="sm"
+              >
+                Reset Password
+              </Button>
+            </div>
+          </div>
+        )}
+      </DialogContent>
+    );
   };
 
   if (isLoading) {
@@ -311,47 +504,7 @@ const UserManagementSection = () => {
                           <Eye className="h-4 w-4" />
                         </Button>
                       </DialogTrigger>
-                      <DialogContent className="bg-gaming-card border-gaming-border max-w-md">
-                        <DialogHeader>
-                          <DialogTitle className="text-foreground">User Details</DialogTitle>
-                          <DialogDescription className="text-muted-foreground">
-                            View and manage user information
-                          </DialogDescription>
-                        </DialogHeader>
-                        
-                        {selectedUser && (
-                          <div className="space-y-4">
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                              <div>
-                                <Label className="text-foreground">Username</Label>
-                                <p className="text-sm text-muted-foreground">{selectedUser.username || 'Not set'}</p>
-                              </div>
-                              <div>
-                                <Label className="text-foreground">Email</Label>
-                                <p className="text-sm text-muted-foreground break-all">{selectedUser.email}</p>
-                              </div>
-                              <div>
-                                <Label className="text-foreground">Full Name</Label>
-                                <p className="text-sm text-muted-foreground">{selectedUser.full_name || 'Not set'}</p>
-                              </div>
-                              <div>
-                                <Label className="text-foreground">Role</Label>
-                                <div className="mt-1">{getUserRoleBadge(selectedUser)}</div>
-                              </div>
-                            </div>
-                            
-                            <div className="flex justify-end space-x-2">
-                              <Button
-                                variant="outline"
-                                onClick={() => resetUserPassword(selectedUser.id, selectedUser.email)}
-                                size="sm"
-                              >
-                                Reset Password
-                              </Button>
-                            </div>
-                          </div>
-                        )}
-                      </DialogContent>
+                      <UserEditDialog user={selectedUser} onUserUpdate={fetchUsers} />
                     </Dialog>
 
                     {user.banned ? (
@@ -393,15 +546,16 @@ const UserManagementSection = () => {
                             <DialogTrigger asChild>
                               <Button variant="outline">Cancel</Button>
                             </DialogTrigger>
-                            <Button
-                              onClick={() => {
-                                handleBanUser(user.id, banReason);
-                                setBanReason("");
-                              }}
-                              variant="destructive"
-                            >
-                              Ban User
-                            </Button>
+<Button
+  onClick={() => {
+    handleBanUser(user, banReason); // Only user and reason!
+    setBanReason("");
+  }}
+  variant="destructive"
+>
+  Ban User
+</Button>
+
                           </div>
                         </DialogContent>
                       </Dialog>

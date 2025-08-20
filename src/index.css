@@ -227,4 +227,34 @@ All colors MUST be HSL.
   .floating {
     animation: float 6s ease-in-out infinite;
   }
+
+  /* Custom Scrollbar Styling for Staff Panel */
+  .staff-panel-scrollbar::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  .staff-panel-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .staff-panel-scrollbar::-webkit-scrollbar-thumb {
+    background: hsl(var(--gaming-border));
+    border-radius: 3px;
+    transition: all 0.2s ease;
+  }
+
+  .staff-panel-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--neon-purple) / 0.5);
+  }
+
+  .staff-panel-scrollbar::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+
+  /* Firefox scrollbar styling */
+  .staff-panel-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--gaming-border)) transparent;
+  }
 }

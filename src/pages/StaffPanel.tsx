@@ -45,6 +45,7 @@ import RulesManager from "@/components/RulesManager";
 import StaffManager from "@/components/StaffManager";
 import UserManagementSection from "@/components/UserManagementSection";
 import TeamManager from "@/components/TeamManager";
+import PartnerManager from "@/components/PartnerManager";
 import NavbarManager from "@/components/NavbarManager";
 import ServerStatsManager from "@/components/ServerStatsManager";
 import { SecurityOverview } from "@/components/SecurityOverview";
@@ -52,6 +53,8 @@ import { SecuritySettings } from "@/components/SecuritySettings";
 import { ApplicationsOverview } from "@/components/ApplicationsOverview";
 import { StaffOverview } from "@/components/StaffOverview";
 import { RulesOverview } from "@/components/RulesOverview";
+import { PartnersOverview } from "@/components/PartnersOverview";
+import { EmailTemplateManager } from "@/components/EmailTemplateManager";
 import { DeploymentSettings } from "@/components/DeploymentSettings";
 
 const DiscordLogsManager = () => {
@@ -268,6 +271,7 @@ const StaffPanel = () => {
   const [applications, setApplications] = useState<any[]>([]);
   const [rules, setRules] = useState<any[]>([]);
   const [staffMembers, setStaffMembers] = useState<any[]>([]);
+  const [partners, setPartners] = useState<any[]>([]);
 
   useEffect(() => {
     if (user) {
@@ -283,7 +287,8 @@ const StaffPanel = () => {
         fetchServerSettings(),
         fetchApplications(),
         fetchRules(),
-        fetchStaffMembers()
+        fetchStaffMembers(),
+        fetchPartners()
       ]);
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -349,6 +354,20 @@ const StaffPanel = () => {
       setStaffMembers(data || []);
     } catch (error) {
       console.error('Error fetching staff members:', error);
+    }
+  };
+
+  const fetchPartners = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('partners')
+        .select('*')
+        .order('order_index', { ascending: true });
+
+      if (error) throw error;
+      setPartners(data || []);
+    } catch (error) {
+      console.error('Error fetching partners:', error);
     }
   };
 
@@ -499,7 +518,7 @@ const StaffPanel = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gaming-dark">
+    <div className="min-h-screen bg-gaming-dark staff-panel-scrollbar">
       <Navbar />
       
       <div className="container mx-auto px-2 sm:px-4 lg:px-6 py-4 sm:py-8">
@@ -514,27 +533,30 @@ const StaffPanel = () => {
 
         <Tabs defaultValue="overview" className="space-y-6">
           <div className="overflow-x-auto">
-            <TabsList className="grid w-full grid-cols-4 sm:grid-cols-6 lg:grid-cols-12 bg-gaming-card border-gaming-border min-w-fit">
+            <TabsList className="grid w-full grid-cols-4 sm:grid-cols-7 lg:grid-cols-14 bg-gaming-card border-gaming-border min-w-fit">
               <TabsTrigger value="overview" className="text-xs sm:text-sm">Overview</TabsTrigger>
               <TabsTrigger value="applications" className="text-xs sm:text-sm">Apps</TabsTrigger>
               <TabsTrigger value="rules" className="text-xs sm:text-sm">Rules</TabsTrigger>
               <TabsTrigger value="staff" className="text-xs sm:text-sm">Staff</TabsTrigger>
               <TabsTrigger value="users" className="text-xs sm:text-sm">Users</TabsTrigger>
               <TabsTrigger value="team" className="text-xs sm:text-sm">Team</TabsTrigger>
+              <TabsTrigger value="partners" className="text-xs sm:text-sm">Partners</TabsTrigger>
               <TabsTrigger value="navbar" className="text-xs sm:text-sm">Navbar</TabsTrigger>
               <TabsTrigger value="settings" className="text-xs sm:text-sm">Settings</TabsTrigger>
               <TabsTrigger value="content" className="text-xs sm:text-sm">Content</TabsTrigger>
               <TabsTrigger value="server-stats" className="text-xs sm:text-sm">Stats</TabsTrigger>
               <TabsTrigger value="deployment" className="text-xs sm:text-sm">Deploy</TabsTrigger>
               <TabsTrigger value="logs" className="text-xs sm:text-sm">Logs</TabsTrigger>
+              <TabsTrigger value="emails" className="text-xs sm:text-sm">Emails</TabsTrigger>
             </TabsList>
           </div>
 
           <TabsContent value="overview" className="space-y-4 sm:space-y-6">
-            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 sm:gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4 sm:gap-6">
               <ApplicationsOverview applications={applications} />
               <StaffOverview staffMembers={staffMembers} />
               <RulesOverview rules={rules} />
+              <PartnersOverview partners={partners} />
               <SecurityOverview 
                 serverSettings={serverSettings} 
                 staffCount={staffMembers.length}
@@ -560,6 +582,10 @@ const StaffPanel = () => {
 
           <TabsContent value="team" className="space-y-4 sm:space-y-6">
             <TeamManager />
+          </TabsContent>
+
+          <TabsContent value="partners" className="space-y-4 sm:space-y-6">
+            <PartnerManager />
           </TabsContent>
 
           <TabsContent value="navbar" className="space-y-4 sm:space-y-6">
@@ -798,6 +824,10 @@ const StaffPanel = () => {
           <TabsContent value="logs" className="space-y-4 sm:space-y-6">
             <DiscordLogsManager />
             <LogsViewer />
+          </TabsContent>
+
+          <TabsContent value="emails" className="space-y-4 sm:space-y-6">
+            <EmailTemplateManager />
           </TabsContent>
         </Tabs>
       </div>

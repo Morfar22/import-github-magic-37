@@ -30,79 +30,18 @@ Deno.serve(async (req) => {
     
     switch (logType) {
       case 'auth':
-        // Since we don't have direct auth logs access, use the auth logs from useful context
-        data = [
-          {
-            id: 'auth-1',
-            timestamp: Date.now() * 1000,
-            level: 'info',
-            event_message: 'User login successful',
-            msg: 'Login completed',
-            path: '/token',
-            status: '200',
-            error: null
-          },
-          {
-            id: 'auth-2', 
-            timestamp: (Date.now() - 60000) * 1000,
-            level: 'info',
-            event_message: 'Token refreshed',
-            msg: 'Token refresh completed',
-            path: '/token',
-            status: '200',
-            error: null
-          }
-        ];
+        // Return empty auth logs
+        data = [];
         break;
         
       case 'database':
-        // Use server_settings table as a sample database activity
-        const { data: dbData, error: dbError } = await supabase
-          .from('server_settings')
-          .select('id, created_at, setting_key, updated_at')
-          .order('updated_at', { ascending: false })
-          .limit(limit);
-          
-        if (dbError) {
-          throw dbError;
-        }
-        
-        data = dbData?.map((setting, index) => ({
-          id: `db-${setting.id}`,
-          timestamp: new Date(setting.updated_at).getTime() * 1000,
-          level: 'info',
-          event_message: `Setting operation: ${setting.setting_key}`,
-          msg: `Database operation on setting: ${setting.setting_key}`,
-          path: null,
-          status: null,
-          error: null
-        })) || [];
+        // Return empty database logs
+        data = [];
         break;
         
       case 'functions':
-        // Simulate edge function logs
-        data = [
-          {
-            id: 'func-1',
-            timestamp: Date.now() * 1000,
-            level: 'info',
-            event_message: 'Edge function execution',
-            method: 'POST',
-            function_id: 'fetch-analytics-logs',
-            execution_time_ms: 120,
-            status_code: 200
-          },
-          {
-            id: 'func-2',
-            timestamp: (Date.now() - 30000) * 1000,
-            level: 'info', 
-            event_message: 'Edge function execution',
-            method: 'POST',
-            function_id: 'discord-logger',
-            execution_time_ms: 85,
-            status_code: 200
-          }
-        ];
+        // Return empty edge function logs
+        data = [];
         break;
         
       default:

@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import CFXStatusIndicator from "@/components/CFXStatusIndicator";
 
 const Navbar = () => {
@@ -13,18 +14,76 @@ const Navbar = () => {
   const [isStaff, setIsStaff] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const [configLoaded, setConfigLoaded] = useState(false);
+  const [userProfile, setUserProfile] = useState<any>(null);
   const [navbarConfig, setNavbarConfig] = useState({
     items: [
       { id: 'home', label: 'Home', path: '/', visible: true, order: 0, staffOnly: false },
       { id: 'apply', label: 'Apply', path: '/apply', visible: true, order: 1, staffOnly: false },
       { id: 'rules', label: 'Rules', path: '/rules', visible: true, order: 2, staffOnly: false },
       { id: 'team', label: 'Our Team', path: '/team', visible: true, order: 3, staffOnly: false },
-      { id: 'staff', label: 'Staff Panel', path: '/staff', visible: true, order: 4, staffOnly: true },
-      { id: 'servers', label: 'Servers', path: '/servers', visible: true, order: 5, staffOnly: true },
-      { id: 'users', label: 'Users', path: '/users', visible: true, order: 6, staffOnly: true }
+      { id: 'partners', label: 'Partners', path: '/partners', visible: true, order: 4, staffOnly: false },
+      { id: 'staff', label: 'Staff Panel', path: '/staff', visible: true, order: 5, staffOnly: true },
+      { id: 'servers', label: 'Servers', path: '/servers', visible: true, order: 6, staffOnly: true },
+      { id: 'users', label: 'Users', path: '/users', visible: true, order: 7, staffOnly: true }
     ]
   });
   const isMobile = useIsMobile();
+
+  // Fetch user profile data
+  useEffect(() => {
+    const fetchUserProfile = async () => {
+      if (!user) {
+        setUserProfile(null);
+        return;
+      }
+
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', user.id)
+          .single();
+
+        if (error && error.code !== 'PGRST116') {
+          console.error('Error fetching user profile:', error);
+        } else {
+          setUserProfile(data);
+        }
+      } catch (error) {
+        console.error('Error fetching user profile:', error);
+      }
+    };
+
+    fetchUserProfile();
+
+    // Set up real-time subscription for profile changes
+    if (user) {
+      const channel = supabase
+        .channel('user-profile-changes')
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'profiles',
+            filter: `id=eq.${user.id}`
+          },
+          (payload) => {
+            console.log('User profile updated:', payload);
+            if (payload.new) {
+              setUserProfile(payload.new);
+            } else if (payload.eventType === 'DELETE') {
+              setUserProfile(null);
+            }
+          }
+        )
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
+    }
+  }, [user]);
 
   useEffect(() => {
     const checkStaffRole = async () => {
@@ -142,12 +201,20 @@ const Navbar = () => {
     <div className="flex flex-col md:flex-row items-start md:items-center space-y-3 md:space-y-0 md:space-x-4">
       {user ? (
         <>
-          <div className="flex items-center space-x-2">
-            <User className="h-4 w-4 text-neon-purple" />
+          <Link to="/profile" className="flex items-center space-x-3 hover:opacity-80 transition-opacity">
+            <Avatar className="h-8 w-8">
+              <AvatarImage 
+                src={userProfile?.avatar_url || user.user_metadata?.avatar_url || user.user_metadata?.picture} 
+                alt={userProfile?.username || user.email || 'User'} 
+              />
+              <AvatarFallback className="bg-neon-purple/20 text-neon-purple text-xs">
+                {(userProfile?.username || user.email || 'U').charAt(0).toUpperCase()}
+              </AvatarFallback>
+            </Avatar>
             <span className="text-sm text-foreground">
-              {user.user_metadata?.username || user.email}
+              {userProfile?.username || user.user_metadata?.full_name || user.email}
             </span>
-          </div>
+          </Link>
           <Button 
             variant="outline" 
             size="sm" 

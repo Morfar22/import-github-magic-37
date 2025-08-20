@@ -2,47 +2,65 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { Resend } from "npm:resend@2.0.0";
 
+// Setup Resend API email sender
 const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
 
+// CORS headers for browser compatibility
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-interface ResetPasswordRequest {
-  userEmail: string;
-}
-
+// Main edge function handler
 const handler = async (req: Request): Promise<Response> => {
-  // Handle CORS preflight requests
+  // Preflight CORS
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
     console.log("Password reset function called");
-    const { userEmail }: ResetPasswordRequest = await req.json();
-    console.log("Attempting to reset password for email:", userEmail);
 
-    // Create admin client with service role key
+    // Parse and validate payload
+    let body: { userEmail?: string };
+    try {
+      body = await req.json();
+      console.log("Incoming request body:", body);
+    } catch {
+      console.log("Failed to parse request body");
+      return new Response(
+        JSON.stringify({ error: "Invalid request body" }),
+        { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+
+    const { userEmail } = body || {};
+    if (!userEmail || typeof userEmail !== "string" || !userEmail.includes("@")) {
+      console.log("Missing/invalid email in request:", userEmail);
+      return new Response(
+        JSON.stringify({ error: "A valid email address is required" }),
+        { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+
+    // Supabase admin for password reset
     const supabaseAdmin = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
       {
         auth: {
           autoRefreshToken: false,
-          persistSession: false
-        }
+          persistSession: false,
+        },
       }
     );
 
-    // Generate password reset link
+    // Determine redirect domain
     const originHeader = req.headers.get('origin') || req.headers.get('referer');
-    const redirectDomain = originHeader || 'https://c2b9c9da-596f-4acf-999d-5d33f978ad1b.lovableproject.com';
-    
+    const redirectDomain = originHeader || 'dreamlightrp.dk';
     console.log("Using redirect domain:", redirectDomain);
-    
+
+    // Generate password reset link
     const { data, error } = await supabaseAdmin.auth.admin.generateLink({
       type: 'recovery',
       email: userEmail,
@@ -52,14 +70,14 @@ const handler = async (req: Request): Promise<Response> => {
     });
 
     if (error) {
+      console.log("Supabase error:", error);
       throw error;
     }
-
     console.log("Password reset link generated for:", userEmail);
 
-    // Send email with the reset link using Resend
+    // Email user the password reset link via Resend
     const emailResponse = await resend.emails.send({
-      from: "Gaming Community <noreply@mmorfar.dk>", // Using your verified domain
+      from: "Gaming Community <noreply@dreamlightrp.co>",
       to: [userEmail],
       subject: "Reset Your Password",
       html: `
@@ -82,32 +100,38 @@ const handler = async (req: Request): Promise<Response> => {
             This link will expire in 24 hours.
           </p>
         </div>
-      `,
+      `
     });
 
     console.log("Password reset email sent successfully:", emailResponse);
 
-    return new Response(JSON.stringify({ 
-      success: true, 
-      message: 'Password reset email sent successfully',
-      emailResponse 
-    }), {
-      status: 200,
-      headers: {
-        "Content-Type": "application/json",
-        ...corsHeaders,
-      },
-    });
+    return new Response(
+      JSON.stringify({
+        success: true,
+        message: 'Password reset email sent successfully',
+        emailResponse
+      }),
+      {
+        status: 200,
+        headers: {
+          "Content-Type": "application/json",
+          ...corsHeaders,
+        }
+      }
+    );
   } catch (error: any) {
     console.error("Error in reset-user-password function:", error);
     return new Response(
-      JSON.stringify({ 
+      JSON.stringify({
         error: error.message,
         details: error.toString()
       }),
       {
         status: 500,
-        headers: { "Content-Type": "application/json", ...corsHeaders },
+        headers: {
+          "Content-Type": "application/json",
+          ...corsHeaders
+        }
       }
     );
   }

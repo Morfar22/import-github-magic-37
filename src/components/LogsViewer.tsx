@@ -42,28 +42,40 @@ const LogsViewer = () => {
   const { toast } = useToast();
 
   const fetchLogs = async () => {
+    console.log('🚀 Starting fetchLogs function...');
     setLoading(true);
     try {
       console.log('🔍 Fetching logs from analytics...');
+      console.log('📡 Supabase client available:', !!supabase);
       
       // Fetch logs in parallel
+      console.log('📡 About to call edge functions...');
       const [authRes, dbRes, edgeRes] = await Promise.all([
         supabase.functions.invoke('fetch-analytics-logs', {
           body: { logType: 'auth', limit: 100 }
+        }).then(res => {
+          console.log('✅ Auth function response:', res);
+          return res;
         }).catch(err => {
-          console.error('Auth logs fetch failed:', err);
+          console.error('❌ Auth logs fetch failed:', err);
           return { data: null, error: err };
         }),
         supabase.functions.invoke('fetch-analytics-logs', {
           body: { logType: 'database', limit: 100 }
+        }).then(res => {
+          console.log('✅ DB function response:', res);
+          return res;
         }).catch(err => {
-          console.error('Database logs fetch failed:', err);
+          console.error('❌ Database logs fetch failed:', err);
           return { data: null, error: err };
         }),
         supabase.functions.invoke('fetch-analytics-logs', {
           body: { logType: 'functions', limit: 100 }
+        }).then(res => {
+          console.log('✅ Edge function response:', res);
+          return res;
         }).catch(err => {
-          console.error('Edge function logs fetch failed:', err);
+          console.error('❌ Edge function logs fetch failed:', err);
           return { data: null, error: err };
         })
       ]);

@@ -11,7 +11,7 @@ import DynamicIcon from "@/components/DynamicIcon";
 import { useToast } from "@/hooks/use-toast";
 import { useServerSettings } from "@/hooks/useServerSettings";
 import { supabase } from "@/integrations/supabase/client";
-import heroImage from "@/assets/hero-image.jpg";
+import heroImage from "@/assets/hero-image.png";
 
 const Index = () => {
   const [serverJoinLink, setServerJoinLink] = useState('');

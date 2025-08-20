@@ -132,9 +132,12 @@ const ApplicationForm = () => {
       try {
         await supabase.functions.invoke('send-application-email', {
           body: {
-            type: selectedType.name,
-            userEmail: user?.email,
-            applicationData: formData
+            applicationId: 'temp-id', // We don't have the actual ID yet
+            templateType: 'application_submitted',
+            recipientEmail: user?.email,
+            applicantName: formData.steam_name || user?.email || 'Applicant',
+            applicationType: selectedType.name,
+            discordName: formData.discord_tag || formData.discord_name || ''
           }
         });
         console.log('Submission email sent successfully');
@@ -252,9 +255,9 @@ const ApplicationForm = () => {
 
   if (!user) {
     return (
-      <div className="min-h-screen bg-gaming-dark">
+      <div className="min-h-screen bg-gaming-dark flex flex-col">
         <Navbar />
-        <div className="container mx-auto px-4 py-8">
+        <div className="flex-1 container mx-auto px-4 py-8">
           <Alert className="max-w-2xl mx-auto">
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>
@@ -268,9 +271,9 @@ const ApplicationForm = () => {
 
   if (hasExistingApplication) {
     return (
-      <div className="min-h-screen bg-gaming-dark">
+      <div className="min-h-screen bg-gaming-dark flex flex-col">
         <Navbar />
-        <div className="container mx-auto px-4 py-8">
+        <div className="flex-1 container mx-auto px-4 py-8">
           <Alert className="max-w-2xl mx-auto">
             <CheckCircle className="h-4 w-4" />
             <AlertDescription>

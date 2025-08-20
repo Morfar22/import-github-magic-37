@@ -29,7 +29,7 @@ const handler = async (req: Request): Promise<Response> => {
     console.log('API key found:', apiKey.substring(0, 10) + '...');
 
     const emailResponse = await resend.emails.send({
-      from: "Nexus RP Portal <noreply@mmorfar.dk>",
+      from: "Nexus RP Portal <noreply@dreamlightrp.co>",
       to: [testEmail],
       subject: "Test Email from Your Gaming App",
       html: `
