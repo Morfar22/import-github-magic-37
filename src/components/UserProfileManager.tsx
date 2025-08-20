@@ -92,19 +92,7 @@ const UserProfileManager = () => {
     try {
       const fileExt = avatarFile.name.split('.').pop();
       const fileName = `${user.id}-${Date.now()}.${fileExt}`;
-      const filePath = `${fileName}`;
-
-      // Create bucket if it doesn't exist
-      const { error: bucketError } = await supabase.storage
-        .createBucket('user-avatars', {
-          public: true,
-          allowedMimeTypes: ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/webp']
-        });
-
-      // Ignore error if bucket already exists
-      if (bucketError && !bucketError.message.includes('already exists')) {
-        console.error('Error creating bucket:', bucketError);
-      }
+      const filePath = `${user.id}/${fileName}`;
 
       const { error: uploadError } = await supabase.storage
         .from('user-avatars')
