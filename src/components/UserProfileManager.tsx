@@ -9,10 +9,11 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { User, Edit2, Save, X, Upload, Camera } from "lucide-react";
+import { User, Edit2, Save, X, Upload, Camera, Link, Unlink } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import DiscordIcon from "@/components/icons/DiscordIcon";
 
 const profileSchema = z.object({
   username: z.string().min(1, "Username is required").max(50, "Username must be less than 50 characters"),
@@ -26,6 +27,7 @@ const UserProfileManager = () => {
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [isConnectingDiscord, setIsConnectingDiscord] = useState(false);
   const { toast } = useToast();
 
   const form = useForm<z.infer<typeof profileSchema>>({
@@ -181,6 +183,145 @@ const UserProfileManager = () => {
     setAvatarFile(null);
     setAvatarPreview(null);
   };
+
+  const handleConnectDiscord = async () => {
+    setIsConnectingDiscord(true);
+    try {
+      const redirectUri = `${window.location.origin}/profile`;
+      
+      const { data, error } = await supabase.functions.invoke('discord-oauth', {
+        body: {
+          action: 'get_auth_url',
+          data: { redirectUri }
+        }
+      });
+
+      if (error) throw error;
+
+      if (data.success) {
+        window.location.href = data.data.authUrl;
+      } else {
+        throw new Error(data.error);
+      }
+    } catch (error) {
+      console.error('Discord connection error:', error);
+      toast({
+        title: "Error",
+        description: "Failed to initiate Discord connection",
+        variant: "destructive",
+      });
+    } finally {
+      setIsConnectingDiscord(false);
+    }
+  };
+
+  const handleDisconnectDiscord = async () => {
+    try {
+      const { data, error } = await supabase.functions.invoke('discord-oauth', {
+        body: {
+          action: 'disconnect',
+          data: { userId: user?.id }
+        }
+      });
+
+      if (error) throw error;
+
+      if (data.success) {
+        // Refresh profile data
+        const { data: updatedProfile } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', user.id)
+          .single();
+
+        setUserProfile(updatedProfile);
+        
+        toast({
+          title: "Success",
+          description: "Discord account disconnected successfully",
+        });
+      } else {
+        throw new Error(data.error);
+      }
+    } catch (error) {
+      console.error('Discord disconnection error:', error);
+      toast({
+        title: "Error",
+        description: "Failed to disconnect Discord account",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Handle Discord OAuth callback
+  useEffect(() => {
+    const handleDiscordCallback = async () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const code = urlParams.get('code');
+      
+      if (code && user) {
+        try {
+          const redirectUri = `${window.location.origin}/profile`;
+          
+          const { data, error } = await supabase.functions.invoke('discord-oauth', {
+            body: {
+              action: 'exchange_code',
+              data: { code, redirectUri }
+            }
+          });
+
+          if (error) throw error;
+
+          if (data.success) {
+            const discordData = data.data;
+            
+            // Update profile with Discord info
+            const { error: updateError } = await supabase
+              .from('profiles')
+              .update({
+                discord_id: discordData.user.id,
+                discord_username: discordData.user.username,
+                discord_discriminator: discordData.user.discriminator,
+                discord_access_token: discordData.accessToken,
+                discord_refresh_token: discordData.refreshToken,
+                discord_connected_at: new Date().toISOString(),
+              })
+              .eq('id', user.id);
+
+            if (updateError) throw updateError;
+
+            // Refresh profile data
+            const { data: updatedProfile } = await supabase
+              .from('profiles')
+              .select('*')
+              .eq('id', user.id)
+              .single();
+
+            setUserProfile(updatedProfile);
+            
+            toast({
+              title: "Success",
+              description: "Discord account connected successfully",
+            });
+
+            // Clean up URL
+            window.history.replaceState({}, document.title, window.location.pathname);
+          } else {
+            throw new Error(data.error);
+          }
+        } catch (error) {
+          console.error('Discord callback error:', error);
+          toast({
+            title: "Error",
+            description: "Failed to connect Discord account",
+            variant: "destructive",
+          });
+        }
+      }
+    };
+
+    handleDiscordCallback();
+  }, [user, toast]);
 
   if (!user) {
     return (
@@ -347,6 +488,63 @@ const UserProfileManager = () => {
                 {userProfile.updated_at ? new Date(userProfile.updated_at).toLocaleDateString() : 'Never'}
               </p>
             </div>
+          </div>
+
+          {/* Discord Connection Section */}
+          <div className="border-t border-gaming-border pt-6">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center space-x-2">
+                <DiscordIcon className="h-5 w-5 text-discord-blue" />
+                <h3 className="text-lg font-semibold text-foreground">Discord Connection</h3>
+              </div>
+            </div>
+            
+            {userProfile.discord_id ? (
+              <div className="flex items-center justify-between bg-green-500/10 border border-green-500/20 rounded-lg p-4">
+                <div className="flex items-center space-x-3">
+                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                  <div>
+                    <p className="text-foreground font-medium">
+                      Connected as {userProfile.discord_username}#{userProfile.discord_discriminator}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Connected on {new Date(userProfile.discord_connected_at).toLocaleDateString()}
+                    </p>
+                  </div>
+                </div>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={handleDisconnectDiscord}
+                  className="border-red-500/20 text-red-400 hover:bg-red-500/10"
+                >
+                  <Unlink className="h-4 w-4 mr-2" />
+                  Disconnect
+                </Button>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between bg-muted/10 border border-gaming-border rounded-lg p-4">
+                <div className="flex items-center space-x-3">
+                  <div className="w-2 h-2 bg-muted-foreground rounded-full"></div>
+                  <div>
+                    <p className="text-foreground font-medium">Discord Not Connected</p>
+                    <p className="text-xs text-muted-foreground">
+                      Connect your Discord account for additional features
+                    </p>
+                  </div>
+                </div>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={handleConnectDiscord}
+                  disabled={isConnectingDiscord}
+                  className="border-discord-blue/20 text-discord-blue hover:bg-discord-blue/10"
+                >
+                  <Link className="h-4 w-4 mr-2" />
+                  {isConnectingDiscord ? 'Connecting...' : 'Connect'}
+                </Button>
+              </div>
+            )}
           </div>
         </div>
       )}
