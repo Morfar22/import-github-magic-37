@@ -9,7 +9,9 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import Navbar from "@/components/Navbar";
+import { StaffSidebar } from "@/components/StaffSidebar";
 import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
@@ -50,12 +52,15 @@ import NavbarManager from "@/components/NavbarManager";
 import ServerStatsManager from "@/components/ServerStatsManager";
 import { SecurityOverview } from "@/components/SecurityOverview";
 import { SecuritySettings } from "@/components/SecuritySettings";
+import { SecurityDashboard } from "@/components/SecurityDashboard";
 import { ApplicationsOverview } from "@/components/ApplicationsOverview";
 import { StaffOverview } from "@/components/StaffOverview";
 import { RulesOverview } from "@/components/RulesOverview";
 import { PartnersOverview } from "@/components/PartnersOverview";
 import { EmailTemplateManager } from "@/components/EmailTemplateManager";
+import TwitchStreamersManager from "@/components/TwitchStreamersManager";
 import { DeploymentSettings } from "@/components/DeploymentSettings";
+import RoleManagement from "@/components/RoleManagement";
 
 const DiscordLogsManager = () => {
   const [discordSettings, setDiscordSettings] = useState<any>({});
@@ -264,6 +269,7 @@ const DiscordLogsManager = () => {
 const StaffPanel = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [serverSettings, setServerSettings] = useState<any>({});
+  const [activeTab, setActiveTab] = useState("overview");
   const { user } = useAuth();
   const { toast } = useToast();
 
@@ -295,6 +301,11 @@ const StaffPanel = () => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // Add refresh function to be passed to child components
+  const refreshData = async () => {
+    await fetchData();
   };
 
   const fetchServerSettings = async () => {
@@ -345,13 +356,68 @@ const StaffPanel = () => {
 
   const fetchStaffMembers = async () => {
     try {
-      const { data, error } = await supabase
+      // Fetch from new role assignments system
+      const { data: roleAssignments, error: assignmentError } = await supabase
+        .from('user_role_assignments')
+        .select(`
+          *,
+          staff_roles!inner (
+            id,
+            name,
+            display_name,
+            color,
+            hierarchy_level
+          )
+        `)
+        .eq('is_active', true);
+
+      if (assignmentError) throw assignmentError;
+
+      // Fetch from old user_roles system (admin/moderator)
+      const { data: oldRoles, error: oldRolesError } = await supabase
         .from('user_roles')
         .select('*')
         .in('role', ['admin', 'moderator']);
 
-      if (error) throw error;
-      setStaffMembers(data || []);
+      if (oldRolesError) throw oldRolesError;
+
+      // Get all user IDs
+      const assignmentUserIds = roleAssignments?.map(assignment => assignment.user_id) || [];
+      const oldRoleUserIds = oldRoles?.map(role => role.user_id) || [];
+      const allUserIds = [...new Set([...assignmentUserIds, ...oldRoleUserIds])];
+
+      if (allUserIds.length === 0) {
+        setStaffMembers([]);
+        return;
+      }
+
+      // Get user profiles
+      const { data: profiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, username, email, full_name')
+        .in('id', allUserIds);
+
+      if (profilesError) throw profilesError;
+
+      // Combine new role assignments with profiles
+      const newStaff = roleAssignments?.map(assignment => ({
+        ...assignment,
+        role: assignment.staff_roles.name, // Map to expected structure
+        profiles: profiles?.find(profile => profile.id === assignment.user_id),
+        isLegacy: false
+      })) || [];
+
+      // Convert old roles to new format
+      const legacyStaff = oldRoles?.map(role => ({
+        ...role,
+        role: role.role, // This already has the role in the right format
+        profiles: profiles?.find(profile => profile.id === role.user_id),
+        isLegacy: true
+      })) || [];
+
+      // Combine both datasets
+      const allStaff = [...newStaff, ...legacyStaff];
+      setStaffMembers(allStaff);
     } catch (error) {
       console.error('Error fetching staff members:', error);
     }
@@ -518,320 +584,384 @@ const StaffPanel = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gaming-dark staff-panel-scrollbar">
-      <Navbar />
-      
-      <div className="container mx-auto px-2 sm:px-4 lg:px-6 py-4 sm:py-8">
-        <div className="mb-6 sm:mb-8">
-          <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-primary bg-clip-text text-transparent mb-2">
-            Staff Panel
-          </h1>
-          <p className="text-sm sm:text-base text-muted-foreground">
-            Manage your FiveM server settings, applications, and staff members
-          </p>
-        </div>
-
-        <Tabs defaultValue="overview" className="space-y-6">
-          <div className="overflow-x-auto">
-            <TabsList className="grid w-full grid-cols-4 sm:grid-cols-7 lg:grid-cols-14 bg-gaming-card border-gaming-border min-w-fit">
-              <TabsTrigger value="overview" className="text-xs sm:text-sm">Overview</TabsTrigger>
-              <TabsTrigger value="applications" className="text-xs sm:text-sm">Apps</TabsTrigger>
-              <TabsTrigger value="rules" className="text-xs sm:text-sm">Rules</TabsTrigger>
-              <TabsTrigger value="staff" className="text-xs sm:text-sm">Staff</TabsTrigger>
-              <TabsTrigger value="users" className="text-xs sm:text-sm">Users</TabsTrigger>
-              <TabsTrigger value="team" className="text-xs sm:text-sm">Team</TabsTrigger>
-              <TabsTrigger value="partners" className="text-xs sm:text-sm">Partners</TabsTrigger>
-              <TabsTrigger value="navbar" className="text-xs sm:text-sm">Navbar</TabsTrigger>
-              <TabsTrigger value="settings" className="text-xs sm:text-sm">Settings</TabsTrigger>
-              <TabsTrigger value="content" className="text-xs sm:text-sm">Content</TabsTrigger>
-              <TabsTrigger value="server-stats" className="text-xs sm:text-sm">Stats</TabsTrigger>
-              <TabsTrigger value="deployment" className="text-xs sm:text-sm">Deploy</TabsTrigger>
-              <TabsTrigger value="logs" className="text-xs sm:text-sm">Logs</TabsTrigger>
-              <TabsTrigger value="emails" className="text-xs sm:text-sm">Emails</TabsTrigger>
-            </TabsList>
-          </div>
-
-          <TabsContent value="overview" className="space-y-4 sm:space-y-6">
-            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4 sm:gap-6">
-              <ApplicationsOverview applications={applications} />
-              <StaffOverview staffMembers={staffMembers} />
-              <RulesOverview rules={rules} />
-              <PartnersOverview partners={partners} />
-              <SecurityOverview 
-                serverSettings={serverSettings} 
-                staffCount={staffMembers.length}
-              />
+    <SidebarProvider>
+      <div className="min-h-screen bg-gaming-dark w-full">
+        <Navbar />
+        
+        <div className="flex w-full">
+          <StaffSidebar activeTab={activeTab} onTabChange={setActiveTab} />
+          
+          <main className="flex-1 bg-gaming-dark">
+            <div className="border-b border-gaming-border p-4 flex items-center bg-gaming-darker/30">
+              <SidebarTrigger className="mr-4 hover:bg-gaming-card hover:scale-110 transition-all duration-300 rounded-lg p-2" />
+              <div className="animate-slide-up">
+                <h1 className="text-xl font-bold text-foreground">
+                  {activeTab === "overview" && "Dashboard Overview"}
+                  {activeTab === "applications" && "Application Management"}
+                  {activeTab === "rules" && "Rules Management"}
+                  {activeTab === "staff" && "Staff Management"}
+                  {activeTab === "role-management" && "Role & Permissions Management"}
+                  {activeTab === "users" && "User Management"}
+                  {activeTab === "team" && "Team Page Management"}
+                  {activeTab === "partners" && "Partners Management"}
+                  {activeTab === "navbar" && "Navigation Management"}
+                  {activeTab === "live-streamers" && "Live Streamers"}
+                  {activeTab === "settings" && "System Settings"}
+                  {activeTab === "content" && "Homepage Content"}
+                  {activeTab === "server-stats" && "Server Statistics"}
+                  {activeTab === "deployment" && "Deployment Settings"}
+                  {activeTab === "logs" && "System Logs"}
+                  {activeTab === "emails" && "Email Templates"}
+                  {activeTab === "security" && "Security Management"}
+                </h1>
+                <div className="flex items-center space-x-2 mt-1">
+                  <div className="w-2 h-2 bg-primary rounded-full animate-pulse"></div>
+                  <span className="text-sm text-muted-foreground">Live Dashboard</span>
+                </div>
+              </div>
             </div>
-          </TabsContent>
-
-          <TabsContent value="applications" className="space-y-4 sm:space-y-6">
-            <ApplicationManager />
-          </TabsContent>
-
-          <TabsContent value="rules" className="space-y-4 sm:space-y-6">
-            <RulesManager />
-          </TabsContent>
-
-          <TabsContent value="staff" className="space-y-4 sm:space-y-6">
-            <StaffManager />
-          </TabsContent>
-
-          <TabsContent value="users" className="space-y-4 sm:space-y-6">
-            <UserManagementSection />
-          </TabsContent>
-
-          <TabsContent value="team" className="space-y-4 sm:space-y-6">
-            <TeamManager />
-          </TabsContent>
-
-          <TabsContent value="partners" className="space-y-4 sm:space-y-6">
-            <PartnerManager />
-          </TabsContent>
-
-          <TabsContent value="navbar" className="space-y-4 sm:space-y-6">
-            <NavbarManager />
-          </TabsContent>
-
-          <TabsContent value="settings" className="space-y-4 sm:space-y-6">
-            {/* Email Test */}
-            <Card className="p-4 sm:p-6 bg-gaming-card border-gaming-border shadow-gaming">
-              <div className="flex items-center space-x-2 mb-4 sm:mb-6">
-                <Settings className="h-5 w-5 text-neon-green" />
-                <h2 className="text-lg sm:text-xl font-semibold text-foreground">Email Testing</h2>
-              </div>
-              
-              <div className="space-y-4">
-                <div>
-                  <Label className="text-foreground text-sm sm:text-base">Test Email Function</Label>
-                  <p className="text-xs sm:text-sm text-muted-foreground mb-4">
-                    Test if your Resend API key is working correctly
-                  </p>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
-                    <Button onClick={testMinimalFunction} variant="outline" size="sm">
-                      Test Minimal Function
-                    </Button>
-                    <Button onClick={testSimpleFunction} variant="outline" size="sm">
-                      Test Simple Function
-                    </Button>
-                    <Button onClick={testEmail} variant="outline" size="sm">
-                      Test Basic Email
-                    </Button>
-                    <Button onClick={testApplicationEmail} variant="outline" size="sm">
-                      Test Application Email
-                    </Button>
+            
+            <div className="p-6 custom-scrollbar animate-fade-in">
+              {activeTab === "overview" && (
+                <div className="space-y-6">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4 sm:gap-6">
+                    <ApplicationsOverview applications={applications} />
+                    <StaffOverview staffMembers={staffMembers} />
+                    <RulesOverview rules={rules} />
+                    <PartnersOverview partners={partners} />
+                    <SecurityOverview 
+                      serverSettings={serverSettings} 
+                      staffCount={staffMembers.length}
+                    />
                   </div>
                 </div>
-              </div>
-            </Card>
+              )}
 
-            {/* General Settings */}
-            <Card className="p-4 sm:p-6 bg-gaming-card border-gaming-border shadow-gaming">
-              <div className="flex items-center space-x-2 mb-4 sm:mb-6">
-                <Settings className="h-5 w-5 text-neon-purple" />
-                <h2 className="text-lg sm:text-xl font-semibold text-foreground">General Settings</h2>
-              </div>
-              
-              <div className="space-y-4">
-                <div>
-                  <Label className="text-foreground text-sm sm:text-base">Server Name</Label>
-                  <Input
-                    value={serverSettings.general_settings?.server_name || ''}
-                    onChange={(e) => {
-                      const newSettings = {
-                        ...serverSettings.general_settings,
-                        server_name: e.target.value
-                      };
-                      setServerSettings({
-                        ...serverSettings,
-                        general_settings: newSettings
-                      });
-                    }}
-                    onBlur={() => handleSettingUpdate('general_settings', serverSettings.general_settings)}
-                    placeholder="Enter your server name..."
-                    className="bg-gaming-dark border-gaming-border text-foreground"
+              {activeTab === "applications" && (
+                <div className="space-y-6">
+                  <ApplicationManager />
+                </div>
+              )}
+
+              {activeTab === "rules" && (
+                <div className="space-y-6">
+                  <RulesManager />
+                </div>
+              )}
+
+              {activeTab === "staff" && (
+                <div className="space-y-6">
+                  <StaffManager onRefresh={refreshData} />
+                </div>
+              )}
+
+              {activeTab === "role-management" && (
+                <div className="space-y-6">
+                  <RoleManagement />
+                </div>
+              )}
+
+              {activeTab === "users" && (
+                <div className="space-y-6">
+                  <UserManagementSection />
+                </div>
+              )}
+
+              {activeTab === "team" && (
+                <div className="space-y-6">
+                  <TeamManager />
+                </div>
+              )}
+
+              {activeTab === "partners" && (
+                <div className="space-y-6">
+                  <PartnerManager />
+                </div>
+              )}
+
+              {activeTab === "navbar" && (
+                <div className="space-y-6">
+                  <NavbarManager />
+                </div>
+              )}
+
+              {activeTab === "live-streamers" && (
+                <div className="space-y-6">
+                  <TwitchStreamersManager />
+                </div>
+              )}
+
+              {activeTab === "content" && (
+                <div className="space-y-6">
+                  <HomepageContentManager />
+                </div>
+              )}
+
+              {activeTab === "server-stats" && (
+                <div className="space-y-6">
+                  <ServerStatsManager />
+                </div>
+              )}
+
+              {activeTab === "deployment" && (
+                <div className="space-y-6">
+                  <DeploymentSettings />
+                </div>
+              )}
+
+              {activeTab === "logs" && (
+                <div className="space-y-6">
+                  <DiscordLogsManager />
+                  <LogsViewer />
+                </div>
+              )}
+
+              {activeTab === "emails" && (
+                <div className="space-y-6">
+                  <EmailTemplateManager />
+                </div>
+              )}
+
+              {activeTab === "security" && (
+                <div className="space-y-6">
+                  <SecurityDashboard />
+                  <SecuritySettings 
+                    serverSettings={serverSettings}
+                    setServerSettings={setServerSettings}
+                    handleSettingUpdate={handleSettingUpdate}
                   />
-                  <p className="text-xs sm:text-sm text-muted-foreground mt-1">
-                    This appears in the homepage hero section
-                  </p>
-                </div>
-
-                <div>
-                  <Label className="text-foreground text-sm sm:text-base">Welcome Message</Label>
-                  <Textarea
-                    value={serverSettings.general_settings?.welcome_message || ''}
-                    onChange={(e) => {
-                      const newSettings = {
-                        ...serverSettings.general_settings,
-                        welcome_message: e.target.value
-                      };
-                      setServerSettings({
-                        ...serverSettings,
-                        general_settings: newSettings
-                      });
-                    }}
-                    onBlur={() => handleSettingUpdate('general_settings', serverSettings.general_settings)}
-                    placeholder="Enter your welcome message..."
-                    className="bg-gaming-dark border-gaming-border text-foreground"
-                    rows={3}
-                  />
-                  <p className="text-xs sm:text-sm text-muted-foreground mt-1">
-                    This appears below the server name on the homepage
-                  </p>
-                </div>
-              </div>
-            </Card>
-
-            {/* Maintenance Mode */}
-            <Card className="p-4 sm:p-6 bg-gaming-card border-gaming-border shadow-gaming">
-              <div className="flex items-center space-x-2 mb-4 sm:mb-6">
-                <AlertCircle className="h-5 w-5 text-yellow-500" />
-                <h2 className="text-lg sm:text-xl font-semibold text-foreground">Maintenance Mode</h2>
-              </div>
-              
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex-1 pr-4">
-                    <Label className="text-foreground text-sm sm:text-base">Enable Maintenance Mode</Label>
-                    <p className="text-xs sm:text-sm text-muted-foreground">
-                      When enabled, only staff can access the site
-                    </p>
-                  </div>
-                  <Switch
-                    checked={serverSettings.general_settings?.maintenance_mode || false}
-                    onCheckedChange={(checked) => {
-                      const newSettings = {
-                        ...serverSettings.general_settings,
-                        maintenance_mode: checked
-                      };
-                      setServerSettings({
-                        ...serverSettings,
-                        general_settings: newSettings
-                      });
-                      handleSettingUpdate('general_settings', newSettings);
-                    }}
-                  />
-                </div>
-                
-                <div className="p-3 sm:p-4 bg-gaming-dark rounded border">
-                  <p className="text-xs sm:text-sm text-muted-foreground">
-                    <strong>Status:</strong> Maintenance mode is currently{' '}
-                    <span className={serverSettings.general_settings?.maintenance_mode ? 'text-yellow-400' : 'text-green-400'}>
-                      {serverSettings.general_settings?.maintenance_mode ? 'ENABLED' : 'DISABLED'}
-                    </span>
-                  </p>
-                </div>
-              </div>
-            </Card>
-
-            {/* Application Settings */}
-            <Card className="p-4 sm:p-6 bg-gaming-card border-gaming-border shadow-gaming">
-              <div className="flex items-center space-x-2 mb-4 sm:mb-6">
-                <FileText className="h-5 w-5 text-neon-green" />
-                <h2 className="text-lg sm:text-xl font-semibold text-foreground">Application Settings</h2>
-              </div>
-              
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex-1 pr-4">
-                    <Label className="text-foreground text-sm sm:text-base">Accept Applications</Label>
-                    <p className="text-xs sm:text-sm text-muted-foreground">
-                      Toggle whether new applications can be submitted
-                    </p>
-                  </div>
-                  <Switch
-                    checked={serverSettings.application_settings?.accept_applications || false}
-                    onCheckedChange={(checked) => {
-                      const newSettings = {
-                        ...serverSettings.application_settings,
-                        accept_applications: checked
-                      };
-                      setServerSettings({
-                        ...serverSettings,
-                        application_settings: newSettings
-                      });
-                      handleSettingUpdate('application_settings', newSettings);
-                    }}
+                  <UserManagementSection />
+                  <IPWhitelistManager 
+                    serverSettings={serverSettings}
+                    setServerSettings={setServerSettings}
+                    handleSettingUpdate={handleSettingUpdate}
                   />
                 </div>
-                
-                <div className="p-3 sm:p-4 bg-gaming-dark rounded border">
-                  <p className="text-xs sm:text-sm text-muted-foreground">
-                    <strong>Status:</strong> Applications are currently{' '}
-                    <span className={serverSettings.application_settings?.accept_applications ? 'text-green-400' : 'text-red-400'}>
-                      {serverSettings.application_settings?.accept_applications ? 'OPEN' : 'CLOSED'}
-                    </span>
-                  </p>
-                </div>
-              </div>
-            </Card>
+              )}
 
-            {/* Discord Settings */}
-            <Card className="p-4 sm:p-6 bg-gaming-card border-gaming-border shadow-gaming">
-              <div className="flex items-center space-x-2 mb-4 sm:mb-6">
-                <Users className="h-5 w-5 text-neon-blue" />
-                <h2 className="text-lg sm:text-xl font-semibold text-foreground">Discord Integration</h2>
-              </div>
-              
-              <div className="space-y-4">
-                <div>
-                  <Label className="text-foreground text-sm sm:text-base">Discord Server ID</Label>
-                  <Input
-                    value={serverSettings.discord_settings?.server_id || ''}
-                    onChange={(e) => {
-                      const newSettings = {
-                        ...serverSettings.discord_settings,
-                        server_id: e.target.value
-                      };
-                      setServerSettings({
-                        ...serverSettings,
-                        discord_settings: newSettings
-                      });
-                    }}
-                    onBlur={() => handleSettingUpdate('discord_settings', serverSettings.discord_settings)}
-                    placeholder="Discord server ID..."
-                    className="bg-gaming-dark border-gaming-border text-foreground"
+              {activeTab === "settings" && (
+                <div className="space-y-6">
+                  {/* Email Test */}
+                  <Card className="p-4 sm:p-6 bg-gaming-card border-gaming-border shadow-gaming">
+                    <div className="flex items-center space-x-2 mb-4 sm:mb-6">
+                      <Settings className="h-5 w-5 text-neon-green" />
+                      <h2 className="text-lg sm:text-xl font-semibold text-foreground">Email Testing</h2>
+                    </div>
+                    
+                    <div className="space-y-4">
+                      <div>
+                        <Label className="text-foreground text-sm sm:text-base">Test Email Function</Label>
+                        <p className="text-xs sm:text-sm text-muted-foreground mb-4">
+                          Test if your Resend API key is working correctly
+                        </p>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+                          <Button onClick={testMinimalFunction} variant="outline" size="sm">
+                            Test Minimal Function
+                          </Button>
+                          <Button onClick={testSimpleFunction} variant="outline" size="sm">
+                            Test Simple Function
+                          </Button>
+                          <Button onClick={testEmail} variant="outline" size="sm">
+                            Test Basic Email
+                          </Button>
+                          <Button onClick={testApplicationEmail} variant="outline" size="sm">
+                            Test Application Email
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  </Card>
+
+                  {/* General Settings */}
+                  <Card className="p-4 sm:p-6 bg-gaming-card border-gaming-border shadow-gaming">
+                    <div className="flex items-center space-x-2 mb-4 sm:mb-6">
+                      <Settings className="h-5 w-5 text-neon-purple" />
+                      <h2 className="text-lg sm:text-xl font-semibold text-foreground">General Settings</h2>
+                    </div>
+                    
+                    <div className="space-y-4">
+                      <div>
+                        <Label className="text-foreground text-sm sm:text-base">Server Name</Label>
+                        <Input
+                          value={serverSettings.general_settings?.server_name || ''}
+                          onChange={(e) => {
+                            const newSettings = {
+                              ...serverSettings.general_settings,
+                              server_name: e.target.value
+                            };
+                            setServerSettings({
+                              ...serverSettings,
+                              general_settings: newSettings
+                            });
+                          }}
+                          onBlur={() => handleSettingUpdate('general_settings', serverSettings.general_settings)}
+                          placeholder="Enter your server name..."
+                          className="bg-gaming-dark border-gaming-border text-foreground"
+                        />
+                        <p className="text-xs sm:text-sm text-muted-foreground mt-1">
+                          This appears in the homepage hero section
+                        </p>
+                      </div>
+
+                      <div>
+                        <Label className="text-foreground text-sm sm:text-base">Welcome Message</Label>
+                        <Textarea
+                          value={serverSettings.general_settings?.welcome_message || ''}
+                          onChange={(e) => {
+                            const newSettings = {
+                              ...serverSettings.general_settings,
+                              welcome_message: e.target.value
+                            };
+                            setServerSettings({
+                              ...serverSettings,
+                              general_settings: newSettings
+                            });
+                          }}
+                          onBlur={() => handleSettingUpdate('general_settings', serverSettings.general_settings)}
+                          placeholder="Enter your welcome message..."
+                          className="bg-gaming-dark border-gaming-border text-foreground"
+                          rows={3}
+                        />
+                        <p className="text-xs sm:text-sm text-muted-foreground mt-1">
+                          This appears below the server name on the homepage
+                        </p>
+                      </div>
+                    </div>
+                  </Card>
+
+                  {/* Maintenance Mode */}
+                  <Card className="p-4 sm:p-6 bg-gaming-card border-gaming-border shadow-gaming">
+                    <div className="flex items-center space-x-2 mb-4 sm:mb-6">
+                      <AlertCircle className="h-5 w-5 text-yellow-500" />
+                      <h2 className="text-lg sm:text-xl font-semibold text-foreground">Maintenance Mode</h2>
+                    </div>
+                    
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1 pr-4">
+                          <Label className="text-foreground text-sm sm:text-base">Enable Maintenance Mode</Label>
+                          <p className="text-xs sm:text-sm text-muted-foreground">
+                            When enabled, only staff can access the site
+                          </p>
+                        </div>
+                        <Switch
+                          checked={serverSettings.general_settings?.maintenance_mode || false}
+                          onCheckedChange={(checked) => {
+                            const newSettings = {
+                              ...serverSettings.general_settings,
+                              maintenance_mode: checked
+                            };
+                            setServerSettings({
+                              ...serverSettings,
+                              general_settings: newSettings
+                            });
+                            handleSettingUpdate('general_settings', newSettings);
+                          }}
+                        />
+                      </div>
+                      
+                      <div className="p-3 sm:p-4 bg-gaming-dark rounded border">
+                        <p className="text-xs sm:text-sm text-muted-foreground">
+                          <strong>Status:</strong> Maintenance mode is currently{' '}
+                          <span className={serverSettings.general_settings?.maintenance_mode ? 'text-yellow-400' : 'text-green-400'}>
+                            {serverSettings.general_settings?.maintenance_mode ? 'ENABLED' : 'DISABLED'}
+                          </span>
+                        </p>
+                      </div>
+                    </div>
+                  </Card>
+
+                  {/* Application Settings */}
+                  <Card className="p-4 sm:p-6 bg-gaming-card border-gaming-border shadow-gaming">
+                    <div className="flex items-center space-x-2 mb-4 sm:mb-6">
+                      <FileText className="h-5 w-5 text-neon-green" />
+                      <h2 className="text-lg sm:text-xl font-semibold text-foreground">Application Settings</h2>
+                    </div>
+                    
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1 pr-4">
+                          <Label className="text-foreground text-sm sm:text-base">Accept Applications</Label>
+                          <p className="text-xs sm:text-sm text-muted-foreground">
+                            Toggle whether new applications can be submitted
+                          </p>
+                        </div>
+                        <Switch
+                          checked={serverSettings.application_settings?.accept_applications || false}
+                          onCheckedChange={(checked) => {
+                            const newSettings = {
+                              ...serverSettings.application_settings,
+                              accept_applications: checked
+                            };
+                            setServerSettings({
+                              ...serverSettings,
+                              application_settings: newSettings
+                            });
+                            handleSettingUpdate('application_settings', newSettings);
+                          }}
+                        />
+                      </div>
+                      
+                      <div className="p-3 sm:p-4 bg-gaming-dark rounded border">
+                        <p className="text-xs sm:text-sm text-muted-foreground">
+                          <strong>Status:</strong> Applications are currently{' '}
+                          <span className={serverSettings.application_settings?.accept_applications ? 'text-green-400' : 'text-red-400'}>
+                            {serverSettings.application_settings?.accept_applications ? 'OPEN' : 'CLOSED'}
+                          </span>
+                        </p>
+                      </div>
+                    </div>
+                  </Card>
+
+                  {/* Discord Settings */}
+                  <Card className="p-4 sm:p-6 bg-gaming-card border-gaming-border shadow-gaming">
+                    <div className="flex items-center space-x-2 mb-4 sm:mb-6">
+                      <Users className="h-5 w-5 text-neon-blue" />
+                      <h2 className="text-lg sm:text-xl font-semibold text-foreground">Discord Integration</h2>
+                    </div>
+                    
+                    <div className="space-y-4">
+                      <div>
+                        <Label className="text-foreground text-sm sm:text-base">Discord Server ID</Label>
+                        <Input
+                          value={serverSettings.discord_settings?.server_id || ''}
+                          onChange={(e) => {
+                            const newSettings = {
+                              ...serverSettings.discord_settings,
+                              server_id: e.target.value
+                            };
+                            setServerSettings({
+                              ...serverSettings,
+                              discord_settings: newSettings
+                            });
+                          }}
+                          onBlur={() => handleSettingUpdate('discord_settings', serverSettings.discord_settings)}
+                          placeholder="Discord server ID..."
+                          className="bg-gaming-dark border-gaming-border text-foreground"
+                        />
+                      </div>
+
+                      <DiscordBotManager 
+                        serverSettings={serverSettings}
+                        setServerSettings={setServerSettings}
+                        handleSettingUpdate={handleSettingUpdate}
+                      />
+                    </div>
+                  </Card>
+
+                  {/* Security Settings */}
+                  <SecuritySettings 
+                    serverSettings={serverSettings}
+                    setServerSettings={setServerSettings}
+                    handleSettingUpdate={handleSettingUpdate}
                   />
                 </div>
-
-                <DiscordBotManager 
-                  serverSettings={serverSettings}
-                  setServerSettings={setServerSettings}
-                  handleSettingUpdate={handleSettingUpdate}
-                />
-              </div>
-            </Card>
-
-            {/* Security Settings */}
-            <SecuritySettings 
-              serverSettings={serverSettings}
-              setServerSettings={setServerSettings}
-              handleSettingUpdate={handleSettingUpdate}
-            />
-          </TabsContent>
-
-          <TabsContent value="content" className="space-y-4 sm:space-y-6">
-            <HomepageContentManager />
-          </TabsContent>
-
-          <TabsContent value="server-stats" className="space-y-4 sm:space-y-6">
-            <ServerStatsManager />
-          </TabsContent>
-
-          <TabsContent value="deployment" className="space-y-4 sm:space-y-6">
-            <DeploymentSettings />
-          </TabsContent>
-
-          <TabsContent value="logs" className="space-y-4 sm:space-y-6">
-            <DiscordLogsManager />
-            <LogsViewer />
-          </TabsContent>
-
-          <TabsContent value="emails" className="space-y-4 sm:space-y-6">
-            <EmailTemplateManager />
-          </TabsContent>
-        </Tabs>
+              )}
+            </div>
+          </main>
+        </div>
       </div>
-    </div>
+    </SidebarProvider>
   );
 };
 

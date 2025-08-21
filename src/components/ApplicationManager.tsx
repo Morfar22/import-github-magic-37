@@ -319,19 +319,26 @@ const ApplicationManager = () => {
 
         if (profileError) throw profileError;
 
+        // Update the application manager to use new template system
         if (userProfile?.email) {
+          let templateType: 'application_accepted' | 'application_denied' | 'application_submitted';
+          if (status === 'approved') {
+            templateType = 'application_accepted';
+          } else if (status === 'rejected') {
+            templateType = 'application_denied';
+          } else {
+            templateType = 'application_submitted'; // fallback
+          }
+
           await supabase.functions.invoke('send-application-email', {
             body: {
-              type: status === 'approved' ? 'approved' : status === 'rejected' ? 'denied' : 'under_review',
-              userEmail: userProfile.email,
-              applicationData: {
-                steam_name: appData.steam_name || '',
-                discord_tag: appData.discord_tag || '',
-                discord_name: appData.discord_name || '',
-                fivem_name: appData.fivem_name || '',
-                review_notes: notes || '',
-                status: status
-              }
+              applicationId: applicationId,
+              templateType: templateType,
+              recipientEmail: userProfile.email,
+              applicantName: appData.steam_name || appData.discord_name || 'Applicant',
+              applicationType: 'RP Application',
+              reviewNotes: notes || '',
+              discordName: appData.discord_tag || appData.discord_name || ''
             }
           });
           console.log('Status update email sent successfully');

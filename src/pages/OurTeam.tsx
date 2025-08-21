@@ -19,6 +19,33 @@ interface TeamMember {
   created_at: string;
 }
 
+const dashboardStats = [
+  {
+    title: "Total Members",
+    valueKey: "totalMembers",
+    color: "hsl(217, 91%, 60%)", // Neon blue
+    icon: Users,
+  },
+  {
+    title: "Active Staff",
+    valueKey: "activeMembers",
+    color: "hsl(120, 100%, 50%)", // Neon green
+    icon: Activity,
+  },
+  {
+    title: "Avg Tenure (months)",
+    valueKey: "avgTenure",
+    color: "hsl(280, 100%, 70%)", // Neon purple
+    icon: TrendingUp,
+  },
+  {
+    title: "Leadership",
+    valueKey: "adminCount+modCount",
+    color: "hsl(48, 100%, 50%)", // Neon yellow
+    icon: Crown,
+  },
+];
+
 const OurTeam = () => {
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [loading, setLoading] = useState(true);
@@ -29,9 +56,11 @@ const OurTeam = () => {
     modCount: 0,
     avgTenure: 0
   });
+  const [hoveredStat, setHoveredStat] = useState<number | null>(null);
 
   useEffect(() => {
     fetchTeamMembers();
+    // eslint-disable-next-line
   }, []);
 
   const fetchTeamMembers = async () => {
@@ -49,21 +78,21 @@ const OurTeam = () => {
 
       const members = data || [];
       setTeamMembers(members);
-      
+
       // Calculate stats
       const activeMembers = members.filter(m => m.is_active);
       const adminCount = members.filter(m => m.role.toLowerCase().includes('admin') || m.role.toLowerCase().includes('owner')).length;
       const modCount = members.filter(m => m.role.toLowerCase().includes('moderator') || m.role.toLowerCase().includes('mod')).length;
-      
+
       // Calculate average tenure (in months)
-      const avgTenure = members.length > 0 
+      const avgTenure = members.length > 0
         ? members.reduce((acc, member) => {
             const memberDate = new Date(member.created_at);
             const monthsDiff = (Date.now() - memberDate.getTime()) / (1000 * 60 * 60 * 24 * 30);
             return acc + monthsDiff;
           }, 0) / members.length
         : 0;
-      
+
       setStats({
         totalMembers: members.length,
         activeMembers: activeMembers.length,
@@ -108,7 +137,7 @@ const OurTeam = () => {
     const now = new Date();
     const diffTime = Math.abs(now.getTime() - date.getTime());
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    
+
     if (diffDays < 30) return `${diffDays} days ago`;
     if (diffDays < 365) return `${Math.floor(diffDays / 30)} months ago`;
     return `${Math.floor(diffDays / 365)} years ago`;
@@ -117,7 +146,6 @@ const OurTeam = () => {
   return (
     <div className="min-h-screen bg-gradient-hero">
       <Navbar />
-      
       <main className="container mx-auto px-4 pt-20 pb-8">
         <div className="text-center mb-12">
           <h1 className="text-4xl md:text-6xl font-bold text-white mb-4 animate-fade-in">
@@ -126,40 +154,41 @@ const OurTeam = () => {
           <p className="text-xl text-gray-300 max-w-2xl mx-auto mb-8">
             Meet the dedicated staff members who keep our community running smoothly
           </p>
-          
-          {/* Team Stats Cards */}
+
+          {/* Team Stats Cards (now glow and are fully responsive) */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-4xl mx-auto mb-8">
-            <Card className="bg-gaming-card/50 border-neon-blue/30 backdrop-blur-sm">
-              <CardContent className="p-4 text-center">
-                <Users className="h-6 w-6 text-neon-blue mx-auto mb-2" />
-                <p className="text-2xl font-bold text-white">{stats.totalMembers}</p>
-                <p className="text-xs text-gray-400">Total Members</p>
-              </CardContent>
-            </Card>
-            
-            <Card className="bg-gaming-card/50 border-neon-green/30 backdrop-blur-sm">
-              <CardContent className="p-4 text-center">
-                <Activity className="h-6 w-6 text-neon-green mx-auto mb-2" />
-                <p className="text-2xl font-bold text-white">{stats.activeMembers}</p>
-                <p className="text-xs text-gray-400">Active Staff</p>
-              </CardContent>
-            </Card>
-            
-            <Card className="bg-gaming-card/50 border-neon-purple/30 backdrop-blur-sm">
-              <CardContent className="p-4 text-center">
-                <TrendingUp className="h-6 w-6 text-neon-purple mx-auto mb-2" />
-                <p className="text-2xl font-bold text-white">{stats.avgTenure}</p>
-                <p className="text-xs text-gray-400">Avg Tenure (months)</p>
-              </CardContent>
-            </Card>
-            
-            <Card className="bg-gaming-card/50 border-yellow-400/30 backdrop-blur-sm">
-              <CardContent className="p-4 text-center">
-                <Crown className="h-6 w-6 text-yellow-400 mx-auto mb-2" />
-                <p className="text-2xl font-bold text-white">{stats.adminCount + stats.modCount}</p>
-                <p className="text-xs text-gray-400">Leadership</p>
-              </CardContent>
-            </Card>
+            {dashboardStats.map((stat, i) => {
+              const IconComp = stat.icon;
+              const value =
+                stat.valueKey === "adminCount+modCount"
+                  ? stats.adminCount + stats.modCount
+                  : stats[stat.valueKey as keyof typeof stats];
+
+              // Glow effect uses inline style instead of Tailwind + CSS variable approach
+              const glowStyle =
+                hoveredStat === i
+                  ? {
+                      borderColor: stat.color,
+                      boxShadow: `0 0 22px 8px ${stat.color}`,
+                    }
+                  : {};
+
+              return (
+                <Card
+                  key={stat.title}
+                  className="bg-gaming-card/50 border border-solid backdrop-blur-sm transition-all duration-200 cursor-pointer"
+                  style={glowStyle}
+                  onMouseEnter={() => setHoveredStat(i)}
+                  onMouseLeave={() => setHoveredStat(null)}
+                >
+                  <CardContent className="p-4 text-center">
+                    <IconComp className="h-6 w-6 mx-auto mb-2" style={{ color: stat.color }} />
+                    <p className="text-2xl font-bold text-white">{value}</p>
+                    <p className="text-xs text-gray-400">{stat.title}</p>
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
 
           {/* Team Activity Status */}
@@ -168,13 +197,14 @@ const OurTeam = () => {
               <span>Team Activity</span>
               <span>{Math.round((stats.activeMembers / Math.max(stats.totalMembers, 1)) * 100)}% Active</span>
             </div>
-            <Progress 
-              value={(stats.activeMembers / Math.max(stats.totalMembers, 1)) * 100} 
+            <Progress
+              value={(stats.activeMembers / Math.max(stats.totalMembers, 1)) * 100}
               className="h-2 bg-gaming-card border border-gaming-border"
             />
           </div>
         </div>
 
+        {/* Member cards, already glow on hover from your previous code */}
         {loading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {[...Array(8)].map((_, i) => (
@@ -204,17 +234,16 @@ const OurTeam = () => {
             {teamMembers.map((member, index) => {
               const RoleIcon = getRoleIcon(member.role);
               const roleColorClass = getRoleColor(member.role);
-              
+
               return (
-                <Card 
-                  key={member.id} 
+                <Card
+                  key={member.id}
                   className="bg-gaming-card border-gaming-border hover:border-neon-purple/50 transition-all duration-300 hover:scale-105 hover:shadow-lg hover:shadow-neon-purple/20 group animate-fade-in"
                   style={{ animationDelay: `${index * 100}ms` }}
                 >
                   <CardHeader className="text-center relative">
                     {/* Status indicator */}
                     <div className={`absolute top-4 right-4 w-3 h-3 rounded-full ${member.is_active ? 'bg-green-400' : 'bg-gray-500'} shadow-lg`} />
-                    
                     {/* Avatar with enhanced styling */}
                     <div className="relative">
                       <Avatar className="h-24 w-24 mx-auto mb-4 ring-2 ring-gaming-border group-hover:ring-neon-purple/50 transition-all duration-300">
@@ -223,37 +252,31 @@ const OurTeam = () => {
                           {getInitials(member.name)}
                         </AvatarFallback>
                       </Avatar>
-                      
                       {/* Role icon overlay */}
                       <div className={`absolute -bottom-2 -right-2 p-2 rounded-full bg-gaming-dark border-2 ${roleColorClass.split(' ')[1]} shadow-lg`}>
-                        <RoleIcon className={`h-4 w-4 ${roleColorClass.split(' ')[0]}`} />
+                        <RoleIcon className={`h-4 w-4 ${roleColorClass.split(' ')}`} />
                       </div>
                     </div>
-                    
                     <CardTitle className="text-white text-lg mb-2 group-hover:text-neon-purple transition-colors">
                       {member.name}
                     </CardTitle>
-                    
                     <Badge variant="outline" className={`${roleColorClass} bg-transparent font-medium`}>
                       <RoleIcon className="h-3 w-3 mr-1" />
                       {member.role}
                     </Badge>
                   </CardHeader>
-                  
                   <CardContent className="space-y-3">
                     {member.bio && (
                       <CardDescription className="text-gray-400 text-center leading-relaxed">
                         {member.bio}
                       </CardDescription>
                     )}
-                    
                     {/* Member stats */}
                     <div className="flex items-center justify-center space-x-4 pt-2 border-t border-gaming-border/50">
                       <div className="flex items-center space-x-1 text-xs text-gray-500">
                         <Calendar className="h-3 w-3" />
                         <span>Joined {getJoinedTime(member.created_at)}</span>
                       </div>
-                      
                       {member.is_active && (
                         <div className="flex items-center space-x-1 text-xs text-green-400">
                           <Heart className="h-3 w-3" />
@@ -261,7 +284,6 @@ const OurTeam = () => {
                         </div>
                       )}
                     </div>
-                    
                     {/* Social indicators (placeholder for future features) */}
                     <div className="flex justify-center space-x-2 pt-2">
                       <div className="flex items-center space-x-1 text-xs text-gray-500 bg-gaming-dark/50 px-2 py-1 rounded-full">

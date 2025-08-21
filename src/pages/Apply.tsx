@@ -241,18 +241,16 @@ const Apply = () => {
         throw error;
       }
 
-      // Send submission email - use form data with fallbacks
+      // Send submission email - use new template system
       try {
         await supabase.functions.invoke('send-application-email', {
           body: {
-            type: 'submission',
-            userEmail: user.email,
-            applicationData: {
-              steam_name: applicationData.steam_name || formData.steam_name || '',
-              discord_tag: applicationData.discord_tag || formData.discord_tag || '',
-              discord_name: applicationData.discord_name || formData.discord_name || '',
-              fivem_name: applicationData.fivem_name || formData.fivem_name || ''
-            }
+            applicationId: data.id || 'temp-id',
+            templateType: 'application_submitted',
+            recipientEmail: user.email,
+            applicantName: applicationData.steam_name || formData.steam_name || user.email || 'Applicant',
+            applicationType: 'RP Application',
+            discordName: applicationData.discord_tag || formData.discord_tag || applicationData.discord_name || formData.discord_name || ''
           }
         });
         console.log('Submission email sent successfully');

@@ -68,13 +68,13 @@ serve(async (req) => {
       console.log('Failed to fetch application discord settings, using defaults:', error)
     }
 
-    // Channel-specific webhook URLs - prioritize application-specific settings for application events
+    // Channel-specific webhook URLs - only use database settings, no fallbacks
     const webhooks = {
-      applications: applicationDiscordSettings.staff_webhook_url || discordSettings.applications_webhook || Deno.env.get('DISCORD_WEBHOOK_URL'),
-      staff: discordSettings.staff_webhook || Deno.env.get('DISCORD_WEBHOOK_URL'), 
-      security: discordSettings.security_webhook || Deno.env.get('DISCORD_WEBHOOK_URL'),
-      general: discordSettings.general_webhook || Deno.env.get('DISCORD_WEBHOOK_URL'),
-      errors: discordSettings.errors_webhook || Deno.env.get('DISCORD_WEBHOOK_URL')
+      applications: applicationDiscordSettings.public_webhook_url || discordSettings.applications_webhook || '',
+      staff: discordSettings.staff_webhook || '', 
+      security: discordSettings.security_webhook || '',
+      general: discordSettings.general_webhook || '',
+      errors: discordSettings.errors_webhook || ''
     }
 
     console.log("Available webhooks:", webhooks)
@@ -113,7 +113,7 @@ serve(async (req) => {
         break
 
       case 'application_approved':
-        webhookUrl = webhooks.applications
+        webhookUrl = applicationDiscordSettings.staff_webhook_url
         const approvedSteamName = data.steam_name || data.form_data?.steam_name || "Not provided";
         const approvedDiscordTag = data.discord_tag || data.form_data?.discord_tag || "Not provided";
         const approvedFivemName = data.fivem_name || data.form_data?.fivem_name || "Not provided";
@@ -134,7 +134,7 @@ serve(async (req) => {
         break
 
       case 'application_denied':
-        webhookUrl = webhooks.applications
+        webhookUrl = applicationDiscordSettings.staff_webhook_url
         const deniedSteamName = data.steam_name || data.form_data?.steam_name || "Not provided";
         const deniedDiscordTag = data.discord_tag || data.form_data?.discord_tag || "Not provided";
         const deniedFivemName = data.fivem_name || data.form_data?.fivem_name || "Not provided";

@@ -60,23 +60,31 @@ export const EmailTemplateManager = () => {
   const updateTemplate = async (templateType: string, subject: string, body: string) => {
     setSaving(true);
     try {
+      // Use upsert to either update existing or create new template
       const { error } = await supabase
         .from('email_templates')
-        .update({ subject, body, updated_at: new Date().toISOString() })
-        .eq('template_type', templateType);
+        .upsert({ 
+          template_type: templateType,
+          subject, 
+          body, 
+          is_active: true,
+          updated_at: new Date().toISOString() 
+        }, {
+          onConflict: 'template_type'
+        });
 
       if (error) throw error;
 
       await fetchTemplates();
       toast({
         title: "Success",
-        description: "Email template updated successfully"
+        description: "Email template saved successfully"
       });
     } catch (error) {
-      console.error('Error updating template:', error);
+      console.error('Error saving template:', error);
       toast({
         title: "Error",
-        description: "Failed to update email template",
+        description: "Failed to save email template",
         variant: "destructive"
       });
     } finally {
@@ -147,11 +155,11 @@ export const EmailTemplateManager = () => {
             </Button>
             <Button
               onClick={handleSave}
-              disabled={saving || !template}
+              disabled={saving}
               size="sm"
             >
               <Save className="h-4 w-4 mr-2" />
-              Save
+              {saving ? 'Saving...' : 'Save'}
             </Button>
           </div>
         </div>

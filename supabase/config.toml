@@ -1,4 +1,108 @@
 project_id = "ganubwsifvjraqsawccl"
 
-[functions.discord-oauth]
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 54322
+
+[studio]
+enabled = true
+port = 54323
+
+[inbucket]
+enabled = true
+port = 54324
+smtp_port = 54325
+pop3_port = 54326
+
+[storage]
+enabled = true
+port = 54325
+file_size_limit = "50MiB"
+
+[auth]
+enabled = true
+port = 54326
+site_url = "http://127.0.0.1:3000"
+additional_redirect_urls = ["https://127.0.0.1:3000"]
+jwt_expiry = 3600
+refresh_token_rotation_enabled = true
+refresh_token_reuse_interval = 10
+enable_signup = true
+
+[auth.email]
+enable_signup = true
+double_confirm_changes = true
+enable_confirmations = false
+
+[edge_functions]
+enabled = true
+port = 54327
+
+[functions.auto-fetch-server-stats]
 verify_jwt = false
+
+[functions.deployment-manager]
+verify_jwt = true
+
+[functions.discord-logger]
+verify_jwt = false
+
+[functions.discord-oauth]
+verify_jwt = true
+
+[functions.discord-role-sync]
+verify_jwt = true
+
+[functions.fetch-analytics-logs]
+verify_jwt = true
+
+[functions.fetch-fivem-data]
+verify_jwt = false
+
+[functions.fetch-individual-server-stats]
+verify_jwt = true
+
+[functions.fetch-server-stats]
+verify_jwt = false
+
+[functions.fetch-twitch-streams]
+verify_jwt = false
+
+[functions.get-mapbox-token]
+verify_jwt = true
+
+[functions.minimal-test]
+verify_jwt = false
+
+[functions.reset-user-password]
+verify_jwt = true
+
+[functions.security-analytics]
+verify_jwt = true
+
+[functions.security-manager]
+verify_jwt = true
+
+[functions.send-application-email]
+verify_jwt = false
+
+[functions.send-ban-notification]
+verify_jwt = true
+
+[functions.simple-test]
+verify_jwt = false
+
+[functions.stats-scheduler]
+verify_jwt = false
+
+[functions.test-email]
+verify_jwt = true
+
+[functions.discord-bot]
+verify_jwt = true

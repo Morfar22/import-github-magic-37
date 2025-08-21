@@ -21,6 +21,7 @@ import OurTeam from "./pages/OurTeam";
 import Partners from "./pages/Partners";
 import ServerManagement from "./pages/ServerManagement";
 import Profile from "./pages/Profile";
+import Live from "./pages/Live";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -65,6 +66,7 @@ const App = () => (
                   } />
                   <Route path="/team" element={<OurTeam />} />
                   <Route path="/partners" element={<Partners />} />
+                  <Route path="/live" element={<Live />} />
                   <Route path="/profile" element={
                     <ProtectedRoute>
                       <Profile />

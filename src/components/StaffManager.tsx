@@ -9,11 +9,16 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { UserPlus, Shield, Trash2, Search, Crown, Users } from "lucide-react";
+import { UserPlus, Shield, Trash2, Search, Crown, Users, Star, AlertTriangle, HelpCircle } from "lucide-react";
 
-const StaffManager = () => {
+interface StaffManagerProps {
+  onRefresh?: () => void;
+}
+
+const StaffManager = ({ onRefresh }: StaffManagerProps) => {
   const [staff, setStaff] = useState<any[]>([]);
   const [allUsers, setAllUsers] = useState<any[]>([]);
+  const [staffRoles, setStaffRoles] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchEmail, setSearchEmail] = useState("");
   const [selectedRole, setSelectedRole] = useState("");
@@ -21,36 +26,99 @@ const StaffManager = () => {
   const { toast } = useToast();
 
   useEffect(() => {
+    fetchStaffRoles();
     fetchStaff();
   }, []);
+
+  const fetchStaffRoles = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('staff_roles')
+        .select('*')
+        .eq('is_active', true)
+        .order('hierarchy_level', { ascending: false });
+
+      if (error) throw error;
+      setStaffRoles(data || []);
+    } catch (error) {
+      console.error('Error fetching staff roles:', error);
+    }
+  };
 
   const fetchStaff = async () => {
     try {
       setIsLoading(true);
-      const { data, error } = await supabase
+      
+      // Fetch from new role assignments system
+      const { data: roleAssignments, error: assignmentError } = await supabase
+        .from('user_role_assignments')
+        .select(`
+          *,
+          staff_roles!inner (
+            id,
+            name,
+            display_name,
+            color,
+            hierarchy_level
+          )
+        `)
+        .eq('is_active', true);
+
+      if (assignmentError) throw assignmentError;
+
+      // Fetch from old user_roles system (admin/moderator)
+      const { data: oldRoles, error: oldRolesError } = await supabase
         .from('user_roles')
         .select('*')
-        .in('role', ['admin', 'moderator'])
-        .order('role', { ascending: true });
+        .in('role', ['admin', 'moderator']);
 
-      if (error) throw error;
+      if (oldRolesError) throw oldRolesError;
 
-      // Get user details separately
-      const userIds = data?.map(role => role.user_id) || [];
+      // Get all user IDs
+      const assignmentUserIds = roleAssignments?.map(assignment => assignment.user_id) || [];
+      const oldRoleUserIds = oldRoles?.map(role => role.user_id) || [];
+      const allUserIds = [...new Set([...assignmentUserIds, ...oldRoleUserIds])];
+
+      // Get user profiles
       const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
         .select('id, username, email, full_name')
-        .in('id', userIds);
+        .in('id', allUserIds);
 
       if (profilesError) throw profilesError;
 
-      // Combine the data
-      const staffWithProfiles = data?.map(role => ({
-        ...role,
-        profiles: profiles?.find(profile => profile.id === role.user_id)
+      // Combine new role assignments with profiles
+      const newStaff = roleAssignments?.map(assignment => ({
+        ...assignment,
+        profiles: profiles?.find(profile => profile.id === assignment.user_id),
+        isLegacy: false
       })) || [];
 
-      setStaff(staffWithProfiles);
+      // Convert old roles to new format
+      const legacyStaff = oldRoles?.map(role => ({
+        id: role.id,
+        user_id: role.user_id,
+        role_id: null,
+        assigned_at: role.created_at,
+        assigned_by: null,
+        expires_at: null,
+        is_active: true,
+        staff_roles: {
+          id: null,
+          name: role.role,
+          display_name: role.role === 'admin' ? 'Administrator (Legacy)' : 'Moderator (Legacy)',
+          color: role.role === 'admin' ? '#7c3aed' : '#2563eb',
+          hierarchy_level: role.role === 'admin' ? 80 : 60
+        },
+        profiles: profiles?.find(profile => profile.id === role.user_id),
+        isLegacy: true
+      })) || [];
+
+      // Combine and sort by hierarchy level
+      const allStaff = [...newStaff, ...legacyStaff];
+      allStaff.sort((a, b) => (b.staff_roles?.hierarchy_level || 0) - (a.staff_roles?.hierarchy_level || 0));
+
+      setStaff(allStaff);
     } catch (error) {
       console.error('Error fetching staff:', error);
       toast({
@@ -85,17 +153,18 @@ const StaffManager = () => {
     }
   };
 
-  const promoteUser = async (userId: string, role: 'admin' | 'moderator') => {
+  const promoteUser = async (userId: string, roleId: string) => {
     try {
-      // Check if user already has any role
-      const { data: existingRole } = await supabase
-        .from('user_roles')
+      // Check if user already has this role
+      const { data: existingAssignment } = await supabase
+        .from('user_role_assignments')
         .select('*')
         .eq('user_id', userId)
-        .eq('role', role)
+        .eq('role_id', roleId)
+        .eq('is_active', true)
         .single();
 
-      if (existingRole) {
+      if (existingAssignment) {
         toast({
           title: "Error",
           description: "User already has this role",
@@ -105,22 +174,25 @@ const StaffManager = () => {
       }
 
       const { error } = await supabase
-        .from('user_roles')
+        .from('user_role_assignments')
         .insert({
           user_id: userId,
-          role: role as 'admin' | 'moderator'
+          role_id: roleId,
+          assigned_by: (await supabase.auth.getUser()).data.user?.id
         });
 
       if (error) throw error;
 
+      const selectedStaffRole = staffRoles.find(r => r.id === roleId);
       await fetchStaff();
+      onRefresh?.(); // Refresh parent data
       setIsAddingStaff(false);
       setSearchEmail("");
       setSelectedRole("");
       setAllUsers([]);
       toast({
         title: "Success",
-        description: `User promoted to ${role} successfully`,
+        description: `User promoted to ${selectedStaffRole?.display_name} successfully`,
       });
     } catch (error) {
       console.error('Error promoting user:', error);
@@ -132,29 +204,46 @@ const StaffManager = () => {
     }
   };
 
-  const changeUserRole = async (userId: string, currentRole: string, newRole: 'admin' | 'moderator') => {
+  const changeUserRole = async (member: any, newRoleId: string) => {
     try {
-      // Delete the old role
-      await supabase
-        .from('user_roles')
-        .delete()
-        .eq('user_id', userId)
-        .eq('role', currentRole as 'admin' | 'moderator');
+      if (member.isLegacy) {
+        // For legacy roles, we need to delete from user_roles and create in user_role_assignments
+        const { error: deleteError } = await supabase
+          .from('user_roles')
+          .delete()
+          .eq('id', member.id);
 
-      // Add the new role
-      const { error } = await supabase
-        .from('user_roles')
-        .insert({
-          user_id: userId,
-          role: newRole as 'admin' | 'moderator'
-        });
+        if (deleteError) throw deleteError;
 
-      if (error) throw error;
+        const { error: insertError } = await supabase
+          .from('user_role_assignments')
+          .insert({
+            user_id: member.user_id,
+            role_id: newRoleId,
+            assigned_by: (await supabase.auth.getUser()).data.user?.id
+          });
 
+        if (insertError) throw insertError;
+      } else {
+        // For new system roles, just update
+        const { error } = await supabase
+          .from('user_role_assignments')
+          .update({
+            role_id: newRoleId,
+            assigned_by: (await supabase.auth.getUser()).data.user?.id,
+            assigned_at: new Date().toISOString()
+          })
+          .eq('id', member.id);
+
+        if (error) throw error;
+      }
+
+      const newStaffRole = staffRoles.find(r => r.id === newRoleId);
       await fetchStaff();
+      onRefresh?.(); // Refresh parent data
       toast({
         title: "Success",
-        description: `User role changed to ${newRole}`,
+        description: `User role changed to ${newStaffRole?.display_name}`,
       });
     } catch (error) {
       console.error('Error changing user role:', error);
@@ -166,17 +255,28 @@ const StaffManager = () => {
     }
   };
 
-  const removeStaff = async (userId: string, role: 'admin' | 'moderator') => {
+  const removeStaff = async (member: any) => {
     try {
-      const { error } = await supabase
-        .from('user_roles')
-        .delete()
-        .eq('user_id', userId)
-        .eq('role', role);
+      if (member.isLegacy) {
+        // For legacy roles, delete from user_roles table
+        const { error } = await supabase
+          .from('user_roles')
+          .delete()
+          .eq('id', member.id);
 
-      if (error) throw error;
+        if (error) throw error;
+      } else {
+        // For new system roles, set is_active to false
+        const { error } = await supabase
+          .from('user_role_assignments')
+          .update({ is_active: false })
+          .eq('id', member.id);
+
+        if (error) throw error;
+      }
 
       await fetchStaff();
+      onRefresh?.(); // Refresh parent data
       toast({
         title: "Success",
         description: "Staff member removed successfully",
@@ -191,21 +291,37 @@ const StaffManager = () => {
     }
   };
 
-  const getRoleBadge = (role: string) => {
-    switch (role) {
-      case 'admin':
-        return <Badge className="bg-red-500/20 text-red-400 border-red-500/30">
-          <Crown className="h-3 w-3 mr-1" />
-          Admin
-        </Badge>;
-      case 'moderator':
-        return <Badge className="bg-blue-500/20 text-blue-400 border-blue-500/30">
-          <Shield className="h-3 w-3 mr-1" />
-          Moderator
-        </Badge>;
-      default:
-        return <Badge variant="outline">{role}</Badge>;
-    }
+  const getRoleBadge = (staffRole: any) => {
+    const getRoleIcon = (roleName: string) => {
+      switch (roleName) {
+        case 'super_admin':
+          return <Crown className="h-3 w-3 mr-1" />;
+        case 'admin':
+          return <Shield className="h-3 w-3 mr-1" />;
+        case 'moderator':
+          return <Users className="h-3 w-3 mr-1" />;
+        case 'helper':
+          return <HelpCircle className="h-3 w-3 mr-1" />;
+        case 'trainee':
+          return <Star className="h-3 w-3 mr-1" />;
+        default:
+          return <AlertTriangle className="h-3 w-3 mr-1" />;
+      }
+    };
+
+    return (
+      <Badge 
+        className="border" 
+        style={{
+          backgroundColor: `${staffRole.color}20`,
+          borderColor: `${staffRole.color}50`,
+          color: staffRole.color
+        }}
+      >
+        {getRoleIcon(staffRole.name)}
+        {staffRole.display_name}
+      </Badge>
+    );
   };
 
   if (isLoading) {
@@ -257,8 +373,17 @@ const StaffManager = () => {
                     <SelectValue placeholder="Select a role" />
                   </SelectTrigger>
                   <SelectContent className="bg-gaming-card border-gaming-border">
-                    <SelectItem value="moderator">Moderator</SelectItem>
-                    <SelectItem value="admin">Admin</SelectItem>
+                    {staffRoles.map((role) => (
+                      <SelectItem key={role.id} value={role.id}>
+                        <div className="flex items-center space-x-2">
+                          <div 
+                            className="w-2 h-2 rounded-full" 
+                            style={{ backgroundColor: role.color }}
+                          />
+                          <span>{role.display_name}</span>
+                        </div>
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -274,7 +399,7 @@ const StaffManager = () => {
                       </div>
                       <Button
                         size="sm"
-                        onClick={() => promoteUser(user.id, selectedRole as 'admin' | 'moderator')}
+                        onClick={() => promoteUser(user.id, selectedRole)}
                         disabled={!selectedRole}
                       >
                         Promote
@@ -293,7 +418,7 @@ const StaffManager = () => {
           <p className="text-muted-foreground text-center py-8">No staff members found</p>
         ) : (
           staff.map((member) => (
-            <Card key={`${member.user_id}-${member.role}`} className="p-4 bg-gaming-dark border-gaming-border">
+            <Card key={member.id} className="p-4 bg-gaming-dark border-gaming-border">
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-3">
                   <div>
@@ -301,30 +426,68 @@ const StaffManager = () => {
                       <h3 className="font-medium text-foreground">
                         {member.profiles?.username || 'Unknown User'}
                       </h3>
-                      {getRoleBadge(member.role)}
+                      {getRoleBadge(member.staff_roles)}
                     </div>
                     <p className="text-sm text-muted-foreground">
                       {member.profiles?.email}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      Added: {new Date(member.created_at).toLocaleDateString()}
+                      Assigned: {new Date(member.assigned_at).toLocaleDateString()}
                     </p>
+                    {member.expires_at && (
+                      <p className="text-xs text-yellow-400">
+                        Expires: {new Date(member.expires_at).toLocaleDateString()}
+                      </p>
+                    )}
                   </div>
                 </div>
 
                 <div className="flex items-center space-x-2">
-                  <Select
-                    value={member.role}
-                    onValueChange={(newRole) => changeUserRole(member.user_id, member.role, newRole as 'admin' | 'moderator')}
-                  >
-                    <SelectTrigger className="w-32 bg-gaming-card border-gaming-border text-foreground">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="bg-gaming-card border-gaming-border">
-                      <SelectItem value="moderator">Moderator</SelectItem>
-                      <SelectItem value="admin">Admin</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  {member.isLegacy ? (
+                    <Select
+                      value=""
+                      onValueChange={(newRoleId) => changeUserRole(member, newRoleId)}
+                    >
+                      <SelectTrigger className="w-40 bg-gaming-card border-gaming-border text-foreground">
+                        <SelectValue placeholder="Upgrade to new role" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-gaming-card border-gaming-border">
+                        {staffRoles.map((role) => (
+                          <SelectItem key={role.id} value={role.id}>
+                            <div className="flex items-center space-x-2">
+                              <div 
+                                className="w-2 h-2 rounded-full" 
+                                style={{ backgroundColor: role.color }}
+                              />
+                              <span>{role.display_name}</span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <Select
+                      value={member.role_id}
+                      onValueChange={(newRoleId) => changeUserRole(member, newRoleId)}
+                    >
+                      <SelectTrigger className="w-40 bg-gaming-card border-gaming-border text-foreground">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="bg-gaming-card border-gaming-border">
+                        {staffRoles.map((role) => (
+                          <SelectItem key={role.id} value={role.id}>
+                            <div className="flex items-center space-x-2">
+                              <div 
+                                className="w-2 h-2 rounded-full" 
+                                style={{ backgroundColor: role.color }}
+                              />
+                              <span>{role.display_name}</span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
 
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
@@ -336,14 +499,14 @@ const StaffManager = () => {
                       <AlertDialogHeader>
                         <AlertDialogTitle className="text-foreground">Remove Staff Member</AlertDialogTitle>
                         <AlertDialogDescription className="text-muted-foreground">
-                          Are you sure you want to remove {member.profiles?.username} from the {member.role} role? 
+                          Are you sure you want to remove {member.profiles?.username} from the {member.staff_roles?.display_name} role? 
                           They will lose their staff permissions.
                         </AlertDialogDescription>
                       </AlertDialogHeader>
                       <AlertDialogFooter>
                         <AlertDialogCancel>Cancel</AlertDialogCancel>
                         <AlertDialogAction
-                          onClick={() => removeStaff(member.user_id, member.role)}
+                          onClick={() => removeStaff(member)}
                           className="bg-red-600 hover:bg-red-700"
                         >
                           Remove

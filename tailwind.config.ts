@@ -59,16 +59,28 @@ export default {
 					'border': 'hsl(var(--gaming-border))'
 				},
 				neon: {
-					'purple': 'hsl(var(--neon-purple))',
+					'gold': 'hsl(var(--neon-gold))',
+					'teal': 'hsl(var(--neon-teal))',
 					'blue': 'hsl(var(--neon-blue))',
-					'cyan': 'hsl(var(--neon-cyan))',
-					'green': 'hsl(var(--neon-green))',
-					'pink': 'hsl(var(--neon-pink))',
-					'orange': 'hsl(var(--neon-orange))'
+					'cream': 'hsl(var(--neon-cream))',
 				},
 				cyber: {
-					'purple': 'hsl(var(--cyber-purple))',
-					'blue': 'hsl(var(--electric-blue))'
+					'gold': 'hsl(var(--cyber-gold))',
+					'teal': 'hsl(var(--neon-teal))'
+				},
+				patriot: {
+					'navy': 'hsl(var(--patriot-navy))',
+					'cream': 'hsl(var(--neon-cream))'
+				},
+				golden: {
+					'primary': 'hsl(var(--neon-gold))',
+					'light': 'hsl(var(--golden-light))',
+					'dark': 'hsl(var(--golden-dark))'
+				},
+				teal: {
+					'primary': 'hsl(var(--neon-teal))',
+					'light': 'hsl(var(--teal-light))',
+					'dark': 'hsl(var(--teal-dark))'
 				},
 			},
 			fontFamily: {
@@ -86,9 +98,10 @@ export default {
 			boxShadow: {
 				'gaming': 'var(--shadow-gaming)',
 				'glow-primary': 'var(--glow-primary)',
-				'glow-blue': 'var(--glow-blue)',
+				'glow-golden': 'var(--glow-golden)',
 				'glow-cyber': 'var(--glow-cyber)',
-				'neon': 'var(--shadow-neon)'
+				'neon': 'var(--shadow-neon)',
+                'glow-teal': '0 0 30px hsl(var(--neon-teal) / 0.3)'
 			},
 			borderRadius: {
 				lg: 'var(--radius)',
