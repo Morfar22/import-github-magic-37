@@ -61,6 +61,7 @@ import { EmailTemplateManager } from "@/components/EmailTemplateManager";
 import TwitchStreamersManager from "@/components/TwitchStreamersManager";
 import { DeploymentSettings } from "@/components/DeploymentSettings";
 import RoleManagement from "@/components/RoleManagement";
+import DesignManager from "@/components/DesignManager";
 
 const DiscordLogsManager = () => {
   const [discordSettings, setDiscordSettings] = useState<any>({});
@@ -612,6 +613,7 @@ const StaffPanel = () => {
                   {activeTab === "deployment" && "Deployment Settings"}
                   {activeTab === "logs" && "System Logs"}
                   {activeTab === "emails" && "Email Templates"}
+                  {activeTab === "design" && "Design & Appearance"}
                   {activeTab === "security" && "Security Management"}
                 </h1>
                 <div className="flex items-center space-x-2 mt-1">
@@ -719,6 +721,12 @@ const StaffPanel = () => {
               {activeTab === "emails" && (
                 <div className="space-y-6">
                   <EmailTemplateManager />
+                </div>
+              )}
+
+              {activeTab === "design" && (
+                <div className="space-y-6">
+                  <DesignManager />
                 </div>
               )}
 
