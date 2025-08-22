@@ -3,6 +3,8 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Separator } from "@/components/ui/separator";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Label } from "@/components/ui/label";
@@ -12,7 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Search, Ban, Shield, Trash2, Eye, Mail, Calendar, Clock, UserX, CheckCircle, AlertTriangle, Edit2, Save, X } from "lucide-react";
+import { Search, Ban, Shield, Trash2, Eye, Mail, Calendar, Clock, UserX, CheckCircle, AlertTriangle, Edit2, Save, X, User, Globe, Gamepad2, MessageSquare } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -36,7 +38,14 @@ const UserManagementSection = () => {
       setIsLoading(true);
       const { data, error } = await supabase
         .from('profiles')
-        .select('*')
+        .select(`
+          *,
+          applications!applications_user_id_fkey(
+            id,
+            created_at,
+            status
+          )
+        `)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -50,10 +59,25 @@ const UserManagementSection = () => {
 
       if (rolesError) throw rolesError;
 
+      // Get new staff role assignments
+      const { data: staffRoles, error: staffRolesError } = await supabase
+        .from('user_role_assignments')
+        .select(`
+          user_id,
+          is_active,
+          expires_at,
+          staff_roles!inner(name, display_name, color, hierarchy_level)
+        `)
+        .eq('is_active', true)
+        .in('user_id', userIds);
+
+      if (staffRolesError) console.error('Error fetching staff roles:', staffRolesError);
+
       // Combine the data
       const usersWithRoles = data?.map(profile => ({
         ...profile,
-        user_roles: roles?.filter(role => role.user_id === profile.id) || []
+        user_roles: roles?.filter(role => role.user_id === profile.id) || [],
+        staff_roles: staffRoles?.filter(role => role.user_id === profile.id) || []
       })) || [];
 
       setUsers(usersWithRoles);
@@ -256,9 +280,31 @@ const handleUpdateUser = async (userId: string, data: z.infer<typeof userEditSch
 
   const getUserRoleBadge = (user: any) => {
     const roles = user.user_roles || [];
+    const staffRoles = user.staff_roles || [];
     const isAdmin = roles.some((role: any) => role.role === 'admin');
     const isModerator = roles.some((role: any) => role.role === 'moderator');
     
+    // Check new staff role system first
+    if (staffRoles.length > 0) {
+      const highestRole = staffRoles.reduce((highest: any, current: any) => 
+        current.staff_roles.hierarchy_level > (highest?.staff_roles?.hierarchy_level || 0) ? current : highest
+      );
+      
+      return (
+        <Badge 
+          className="border-0" 
+          style={{ 
+            backgroundColor: `${highestRole.staff_roles.color}20`,
+            color: highestRole.staff_roles.color,
+            borderColor: `${highestRole.staff_roles.color}50`
+          }}
+        >
+          {highestRole.staff_roles.display_name}
+        </Badge>
+      );
+    }
+    
+    // Fallback to old role system
     if (isAdmin) {
       return <Badge className="bg-red-500/20 text-red-400 border-red-500/30">Admin</Badge>;
     }
@@ -366,22 +412,139 @@ const handleUpdateUser = async (userId: string, data: z.infer<typeof userEditSch
             </form>
           </Form>
         ) : (
-          <div className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <Label className="text-foreground">Username</Label>
-                <p className="text-sm text-muted-foreground">{user.username || 'Not set'}</p>
-              </div>
-              <div>
-                <Label className="text-foreground">Email</Label>
-                <p className="text-sm text-muted-foreground break-all">{user.email}</p>
-              </div>
-              <div>
-                <Label className="text-foreground">Full Name</Label>
-                <p className="text-sm text-muted-foreground">{user.full_name || 'Not set'}</p>
+          <div className="space-y-6">
+            {/* User Avatar and Basic Info */}
+            <div className="flex items-start space-x-4">
+              <Avatar className="h-20 w-20">
+                <AvatarImage src={user.avatar_url || undefined} />
+                <AvatarFallback className="bg-gaming-dark text-foreground text-lg">
+                  <User className="h-8 w-8" />
+                </AvatarFallback>
+              </Avatar>
+              <div className="flex-1">
+                <h3 className="text-lg font-semibold text-foreground">{user.username || 'No username'}</h3>
+                <p className="text-muted-foreground">{user.email}</p>
+                {getUserRoleBadge(user)}
               </div>
             </div>
-            
+
+            <Separator className="bg-gaming-border" />
+
+            {/* Comprehensive User Information */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-4">
+                <h4 className="font-medium text-foreground">Profile Information</h4>
+                <div className="space-y-3">
+                  <div>
+                    <Label className="text-foreground">Full Name</Label>
+                    <p className="text-sm text-muted-foreground">{user.full_name || 'Not set'}</p>
+                  </div>
+                  <div>
+                    <Label className="text-foreground">Steam ID</Label>
+                    <p className="text-sm text-muted-foreground">{user.steam_id || 'Not connected'}</p>
+                  </div>
+                  {user.website && (
+                    <div>
+                      <Label className="text-foreground flex items-center space-x-1">
+                        <Globe className="h-3 w-3" />
+                        <span>Website</span>
+                      </Label>
+                      <p className="text-sm text-muted-foreground break-all">{user.website}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <h4 className="font-medium text-foreground">Discord Information</h4>
+                <div className="space-y-3">
+                  {user.discord_username && (
+                    <div>
+                      <Label className="text-foreground flex items-center space-x-1">
+                        <MessageSquare className="h-3 w-3" />
+                        <span>Discord Username</span>
+                      </Label>
+                      <p className="text-sm text-muted-foreground">{user.discord_username}</p>
+                    </div>
+                  )}
+                  {user.discord_id && (
+                    <div>
+                      <Label className="text-foreground">Discord ID</Label>
+                      <p className="text-sm text-muted-foreground font-mono">{user.discord_id}</p>
+                    </div>
+                  )}
+                  {user.discord_connected_at && (
+                    <div>
+                      <Label className="text-foreground">Discord Connected</Label>
+                      <p className="text-sm text-muted-foreground">
+                        {new Date(user.discord_connected_at).toLocaleDateString()}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <Separator className="bg-gaming-border" />
+
+            {/* Account Information */}
+            <div className="space-y-4">
+              <h4 className="font-medium text-foreground">Account Information</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-foreground">Account Created</Label>
+                  <p className="text-sm text-muted-foreground">
+                    {new Date(user.created_at).toLocaleDateString()} at{' '}
+                    {new Date(user.created_at).toLocaleTimeString()}
+                  </p>
+                </div>
+                <div>
+                  <Label className="text-foreground">Last Updated</Label>
+                  <p className="text-sm text-muted-foreground">
+                    {user.updated_at ? new Date(user.updated_at).toLocaleDateString() : 'Never'}
+                  </p>
+                </div>
+                <div>
+                  <Label className="text-foreground">Applications Submitted</Label>
+                  <p className="text-sm text-muted-foreground">
+                    {user.applications?.length || 0} applications
+                  </p>
+                </div>
+                {user.banned && (
+                  <>
+                    <div>
+                      <Label className="text-foreground text-red-400">Banned At</Label>
+                      <p className="text-sm text-red-400">
+                        {new Date(user.banned_at).toLocaleDateString()}
+                      </p>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+
+            {/* Applications History */}
+            {user.applications && user.applications.length > 0 && (
+              <>
+                <Separator className="bg-gaming-border" />
+                <div className="space-y-4">
+                  <h4 className="font-medium text-foreground">Recent Applications</h4>
+                  <div className="space-y-2">
+                    {user.applications.slice(0, 3).map((app: any) => (
+                      <div key={app.id} className="flex items-center justify-between p-2 bg-gaming-dark rounded">
+                        <span className="text-sm text-muted-foreground">
+                          {new Date(app.created_at).toLocaleDateString()}
+                        </span>
+                        <Badge variant={app.status === 'approved' ? 'default' : app.status === 'rejected' ? 'destructive' : 'secondary'}>
+                          {app.status}
+                        </Badge>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
+
             <div className="flex justify-end space-x-2">
               <Button
                 variant="outline"
@@ -454,11 +617,17 @@ const handleUpdateUser = async (userId: string, data: z.infer<typeof userEditSch
           ) : (
             filteredUsers.map((user) => (
               <Card key={user.id} className="p-4 bg-gaming-dark border-gaming-border">
-                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4">
                   <div className="flex items-start space-x-4 flex-1 min-w-0">
+                    <Avatar className="h-12 w-12 shrink-0">
+                      <AvatarImage src={user.avatar_url || undefined} />
+                      <AvatarFallback className="bg-gaming-darker text-foreground">
+                        <User className="h-6 w-6" />
+                      </AvatarFallback>
+                    </Avatar>
                     <div className="flex-1 min-w-0">
-                      <div className="flex flex-wrap items-center gap-2 mb-2">
-                        <h3 className="font-medium text-foreground truncate">
+                      <div className="flex flex-wrap items-center gap-2 mb-3">
+                        <h3 className="font-semibold text-foreground text-lg">
                           {user.username || 'No username'}
                         </h3>
                         {getUserRoleBadge(user)}
@@ -469,26 +638,57 @@ const handleUpdateUser = async (userId: string, data: z.infer<typeof userEditSch
                           </Badge>
                         )}
                       </div>
-                      <div className="text-sm space-y-1">
-                        <div className="flex items-center space-x-2 text-muted-foreground">
-                          <Mail className="h-3 w-3 shrink-0" />
-                          <span className="truncate">{user.email}</span>
-                        </div>
-                        {user.full_name && (
-                          <div className="text-muted-foreground">
-                            Full name: {user.full_name}
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                        <div className="space-y-2">
+                          <div className="flex items-center space-x-2 text-muted-foreground">
+                            <Mail className="h-3 w-3 shrink-0" />
+                            <span className="truncate">{user.email}</span>
                           </div>
-                        )}
-                        <div className="flex items-center space-x-2 text-muted-foreground">
-                          <Calendar className="h-3 w-3 shrink-0" />
-                          <span>Joined: {new Date(user.created_at).toLocaleDateString()}</span>
+                          {user.full_name && (
+                            <div className="flex items-center space-x-2 text-muted-foreground">
+                              <User className="h-3 w-3 shrink-0" />
+                              <span>{user.full_name}</span>
+                            </div>
+                          )}
+                          {user.discord_username && (
+                            <div className="flex items-center space-x-2 text-muted-foreground">
+                              <MessageSquare className="h-3 w-3 shrink-0" />
+                              <span>{user.discord_username}</span>
+                            </div>
+                          )}
+                          {user.steam_id && (
+                            <div className="flex items-center space-x-2 text-muted-foreground">
+                              <Gamepad2 className="h-3 w-3 shrink-0" />
+                              <span className="font-mono text-xs">{user.steam_id}</span>
+                            </div>
+                          )}
                         </div>
-                        {user.banned_at && (
-                          <div className="flex items-center space-x-2 text-red-400">
-                            <Clock className="h-3 w-3 shrink-0" />
-                            <span>Banned: {new Date(user.banned_at).toLocaleDateString()}</span>
+                        
+                        <div className="space-y-2">
+                          <div className="flex items-center space-x-2 text-muted-foreground">
+                            <Calendar className="h-3 w-3 shrink-0" />
+                            <span>Joined: {new Date(user.created_at).toLocaleDateString()}</span>
                           </div>
-                        )}
+                          {user.applications && user.applications.length > 0 && (
+                            <div className="flex items-center space-x-2 text-muted-foreground">
+                              <CheckCircle className="h-3 w-3 shrink-0" />
+                              <span>{user.applications.length} application(s)</span>
+                            </div>
+                          )}
+                          {user.banned_at && (
+                            <div className="flex items-center space-x-2 text-red-400">
+                              <Clock className="h-3 w-3 shrink-0" />
+                              <span>Banned: {new Date(user.banned_at).toLocaleDateString()}</span>
+                            </div>
+                          )}
+                          {user.website && (
+                            <div className="flex items-center space-x-2 text-muted-foreground">
+                              <Globe className="h-3 w-3 shrink-0" />
+                              <span className="truncate text-xs">{user.website}</span>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>

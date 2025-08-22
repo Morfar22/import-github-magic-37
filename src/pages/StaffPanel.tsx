@@ -61,6 +61,7 @@ import { EmailTemplateManager } from "@/components/EmailTemplateManager";
 import TwitchStreamersManager from "@/components/TwitchStreamersManager";
 import { DeploymentSettings } from "@/components/DeploymentSettings";
 import RoleManagement from "@/components/RoleManagement";
+import LiveChatManager from "@/components/LiveChatManager";
 import DesignManager from "@/components/DesignManager";
 
 const DiscordLogsManager = () => {
@@ -613,8 +614,9 @@ const StaffPanel = () => {
                   {activeTab === "deployment" && "Deployment Settings"}
                   {activeTab === "logs" && "System Logs"}
                   {activeTab === "emails" && "Email Templates"}
-                  {activeTab === "design" && "Design & Appearance"}
-                  {activeTab === "security" && "Security Management"}
+                   {activeTab === "design" && "Design & Appearance"}
+                   {activeTab === "chat" && "Live Chat Management"}
+                   {activeTab === "security" && "Security Management"}
                 </h1>
                 <div className="flex items-center space-x-2 mt-1">
                   <div className="w-2 h-2 bg-primary rounded-full animate-pulse"></div>
@@ -721,6 +723,12 @@ const StaffPanel = () => {
               {activeTab === "emails" && (
                 <div className="space-y-6">
                   <EmailTemplateManager />
+                </div>
+              )}
+
+              {activeTab === "chat" && (
+                <div className="space-y-6">
+                  <LiveChatManager />
                 </div>
               )}
 

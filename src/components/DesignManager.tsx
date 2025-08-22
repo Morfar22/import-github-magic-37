@@ -17,6 +17,10 @@ interface DesignSettings {
   accent_color?: string;
   background_color?: string;
   text_color?: string;
+  border_color?: string;
+  card_color?: string;
+  muted_color?: string;
+  destructive_color?: string;
   font_primary?: string;
   font_secondary?: string;
   border_radius?: string;
@@ -37,6 +41,12 @@ const DesignManager = () => {
     fetchDesignSettings();
   }, []);
 
+  useEffect(() => {
+    if (Object.keys(designSettings).length > 0) {
+      applyDesignSettings(designSettings);
+    }
+  }, [designSettings]);
+
   const fetchDesignSettings = async () => {
     try {
       const { data, error } = await supabase
@@ -56,15 +66,9 @@ const DesignManager = () => {
           settings.welcome_message = generalSettings.welcome_message;
         }
       });
-
       setDesignSettings(settings);
     } catch (error) {
-      console.error('Error fetching design settings:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load design settings",
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: "Failed to load design settings", variant: "destructive" });
     }
   };
 
@@ -72,23 +76,13 @@ const DesignManager = () => {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    // Validate file type
     if (!file.type.startsWith('image/')) {
-      toast({
-        title: "Invalid File",
-        description: "Please upload an image file",
-        variant: "destructive",
-      });
+      toast({ title: "Invalid File", description: "Please upload an image file", variant: "destructive" });
       return;
     }
 
-    // Validate file size (5MB limit)
     if (file.size > 5 * 1024 * 1024) {
-      toast({
-        title: "File Too Large",
-        description: "Please upload an image smaller than 5MB",
-        variant: "destructive",
-      });
+      toast({ title: "File Too Large", description: "Please upload an image smaller than 5MB", variant: "destructive" });
       return;
     }
 
@@ -101,7 +95,6 @@ const DesignManager = () => {
       const { error: uploadError } = await supabase.storage
         .from('user-avatars')
         .upload(filePath, file);
-
       if (uploadError) throw uploadError;
 
       const { data: { publicUrl } } = supabase.storage
@@ -113,17 +106,9 @@ const DesignManager = () => {
         hero_image_url: publicUrl
       }));
 
-      toast({
-        title: "Image Uploaded",
-        description: "Hero image uploaded successfully",
-      });
+      toast({ title: "Image Uploaded", description: "Hero image uploaded successfully" });
     } catch (error) {
-      console.error('Error uploading image:', error);
-      toast({
-        title: "Upload Failed",
-        description: "Failed to upload image",
-        variant: "destructive",
-      });
+      toast({ title: "Upload Failed", description: "Failed to upload image", variant: "destructive" });
     } finally {
       setUploading(false);
     }
@@ -132,22 +117,18 @@ const DesignManager = () => {
   const saveDesignSettings = async () => {
     setIsLoading(true);
     try {
-      // Save design settings
       const designData = { ...designSettings };
       delete designData.server_name;
       delete designData.welcome_message;
-
       const { error: designError } = await supabase
         .from('server_settings')
         .upsert({
           setting_key: 'design_settings',
           setting_value: designData,
           updated_at: new Date().toISOString()
-        });
-
+        }, { onConflict: 'setting_key' });
       if (designError) throw designError;
 
-      // Save general settings if they exist
       if (designSettings.server_name || designSettings.welcome_message) {
         const { error: generalError } = await supabase
           .from('server_settings')
@@ -158,41 +139,142 @@ const DesignManager = () => {
               welcome_message: designSettings.welcome_message
             },
             updated_at: new Date().toISOString()
-          });
-
+          }, { onConflict: 'setting_key' });
         if (generalError) throw generalError;
       }
 
-      // Apply CSS changes to the document if custom CSS is provided
-      if (designSettings.custom_css) {
-        updateCustomCSS(designSettings.custom_css);
-      }
-
-      toast({
-        title: "Settings Saved",
-        description: "Design settings updated successfully. Refresh the page to see changes.",
-      });
+      applyDesignSettings(designSettings);
+      toast({ title: "Settings Saved & Applied", description: "Design settings updated and applied successfully." });
     } catch (error) {
-      console.error('Error saving design settings:', error);
-      toast({
-        title: "Error",
-        description: "Failed to save design settings",
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: "Failed to save design settings", variant: "destructive" });
     } finally {
       setIsLoading(false);
     }
   };
 
-  const updateCustomCSS = (css: string) => {
-    // Remove existing custom style element if it exists
-    const existingStyle = document.getElementById('custom-design-css');
-    if (existingStyle) {
-      existingStyle.remove();
+  const applyDesignSettings = (settings: DesignSettings) => {
+    const root = document.documentElement;
+
+    // Colors to CSS
+    if (settings.primary_color) {
+      const hsl = hexToHsl(settings.primary_color);
+      root.style.setProperty('--primary', hsl);
+      root.style.setProperty('--neon-teal', hsl);
+      root.style.setProperty('--teal-primary', hsl);
+    }
+    if (settings.secondary_color) {
+      const hsl = hexToHsl(settings.secondary_color);
+      root.style.setProperty('--secondary', hsl);
+      root.style.setProperty('--neon-gold', hsl);
+      root.style.setProperty('--cyber-gold', hsl);
+      root.style.setProperty('--golden-primary', hsl);
+    }
+    if (settings.accent_color) {
+      const hsl = hexToHsl(settings.accent_color);
+      root.style.setProperty('--accent', hsl);
+      root.style.setProperty('--neon-blue', hsl);
+    }
+    if (settings.background_color) {
+      const hsl = hexToHsl(settings.background_color);
+      root.style.setProperty('--background', hsl);
+      root.style.setProperty('--gaming-dark', hsl);
+      root.style.setProperty('--gaming-darker', adjustHslBrightness(hsl, -10));
+    }
+    if (settings.text_color) {
+      const hsl = hexToHsl(settings.text_color);
+      root.style.setProperty('--foreground', hsl);
+      root.style.setProperty('--neon-cream', hsl);
+      root.style.setProperty('--patriot-cream', hsl);
+    }
+    if (settings.border_color) {
+      const hsl = hexToHsl(settings.border_color);
+      root.style.setProperty('--border', hsl);
+      root.style.setProperty('--gaming-border', hsl);
+    }
+    if (settings.card_color) {
+      const hsl = hexToHsl(settings.card_color);
+      root.style.setProperty('--card', hsl);
+      root.style.setProperty('--gaming-card', hsl);
+    }
+    if (settings.muted_color) {
+      const hsl = hexToHsl(settings.muted_color);
+      root.style.setProperty('--muted', hsl);
+    }
+    if (settings.destructive_color) {
+      const hsl = hexToHsl(settings.destructive_color);
+      root.style.setProperty('--destructive', hsl);
     }
 
-    // Add new custom CSS
-    if (css.trim()) {
+    // Additional color mappings
+    if (settings.primary_color) {
+      const hsl = hexToHsl(settings.primary_color);
+      root.style.setProperty('--primary-foreground', adjustHslBrightness(hsl, 90));
+    }
+    if (settings.secondary_color) {
+      const hsl = hexToHsl(settings.secondary_color);
+      root.style.setProperty('--secondary-foreground', adjustHslBrightness(hsl, -50));
+    }
+    if (settings.card_color) {
+      const hsl = hexToHsl(settings.card_color);
+      root.style.setProperty('--card-foreground', adjustHslBrightness(hsl, 80));
+    }
+    if (settings.muted_color) {
+      const hsl = hexToHsl(settings.muted_color);
+      root.style.setProperty('--muted-foreground', adjustHslBrightness(hsl, 40));
+    }
+
+    // Fonts
+    if (settings.font_primary) root.style.setProperty('--font-primary', settings.font_primary);
+    if (settings.font_secondary) root.style.setProperty('--font-secondary', settings.font_secondary);
+
+    // Layout
+    if (settings.border_radius) root.style.setProperty('--radius', settings.border_radius);
+
+    // Custom CSS always live - fixed functionality
+    updateCustomCSS(settings.custom_css || '');
+
+    // Hero image
+    if (settings.hero_image_url) {
+      const heroSections = document.querySelectorAll('[data-hero-bg]');
+      heroSections.forEach(section => {
+        (section as HTMLElement).style.backgroundImage = `url(${settings.hero_image_url})`;
+      });
+    }
+  };
+
+  const hexToHsl = (hex: string): string => {
+    const r = parseInt(hex.slice(1, 3), 16) / 255;
+    const g = parseInt(hex.slice(3, 5), 16) / 255;
+    const b = parseInt(hex.slice(5, 7), 16) / 255;
+    const max = Math.max(r, g, b);
+    const min = Math.min(r, g, b);
+    const diff = max - min;
+    const sum = max + min;
+    const l = sum / 2;
+    let h = 0, s = 0;
+    if (diff !== 0) {
+      s = l > 0.5 ? diff / (2 - sum) : diff / sum;
+      switch (max) {
+        case r: h = ((g - b) / diff) + (g < b ? 6 : 0); break;
+        case g: h = (b - r) / diff + 2; break;
+        case b: h = (r - g) / diff + 4; break;
+      }
+      h /= 6;
+    }
+    return `${Math.round(h * 360)} ${Math.round(s * 100)}% ${Math.round(l * 100)}%`;
+  };
+
+  const adjustHslBrightness = (hsl: string, adjustment: number): string => {
+    const [h, s, l] = hsl.split(' ');
+    const lightness = parseInt(l.replace('%', ''));
+    const newLightness = Math.max(0, Math.min(100, lightness + adjustment));
+    return `${h} ${s} ${newLightness}%`;
+  };
+
+  const updateCustomCSS = (css: string) => {
+    const existingStyle = document.getElementById('custom-design-css');
+    if (existingStyle) existingStyle.remove();
+    if (css && css.trim()) {
       const style = document.createElement('style');
       style.id = 'custom-design-css';
       style.textContent = css;
@@ -216,11 +298,7 @@ const DesignManager = () => {
       welcome_message: 'Experience the ultimate GTA V roleplay in our cyberpunk-themed city. Professional staff, custom content, and endless possibilities await.',
       custom_css: ''
     });
-    
-    toast({
-      title: "Settings Reset",
-      description: "Design settings reset to defaults",
-    });
+    toast({ title: "Settings Reset", description: "Design settings reset to defaults" });
   };
 
   const exportSettings = () => {
@@ -232,11 +310,8 @@ const DesignManager = () => {
     link.download = 'design-settings.json';
     link.click();
     URL.revokeObjectURL(url);
-    
-    toast({
-      title: "Settings Exported",
-      description: "Design settings exported successfully",
-    });
+
+    toast({ title: "Settings Exported", description: "Design settings exported successfully" });
   };
 
   return (
@@ -262,7 +337,6 @@ const DesignManager = () => {
             </Button>
           </div>
         </div>
-
         <Tabs defaultValue="hero" className="space-y-6">
           <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="hero">Hero Section</TabsTrigger>
@@ -271,14 +345,12 @@ const DesignManager = () => {
             <TabsTrigger value="layout">Layout</TabsTrigger>
             <TabsTrigger value="advanced">Advanced</TabsTrigger>
           </TabsList>
-
           <TabsContent value="hero" className="space-y-6">
             <Card className="p-4 bg-gaming-darker border-gaming-border">
               <h3 className="text-lg font-semibold mb-4 text-foreground flex items-center">
                 <Image className="h-5 w-5 mr-2 text-neon-teal" />
                 Hero Image & Content
               </h3>
-              
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-4">
                   <div>
@@ -303,7 +375,6 @@ const DesignManager = () => {
                       {uploading && <p className="text-sm text-muted-foreground">Uploading...</p>}
                     </div>
                   </div>
-
                   <div>
                     <Label className="text-foreground">Server Name</Label>
                     <Input
@@ -314,7 +385,6 @@ const DesignManager = () => {
                     />
                   </div>
                 </div>
-
                 <div>
                   <Label className="text-foreground">Welcome Message</Label>
                   <Textarea
@@ -328,97 +398,222 @@ const DesignManager = () => {
               </div>
             </Card>
           </TabsContent>
-
           <TabsContent value="colors" className="space-y-6">
             <Card className="p-4 bg-gaming-darker border-gaming-border">
               <h3 className="text-lg font-semibold mb-4 text-foreground">Color Scheme</h3>
-              
               <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                 <div>
                   <Label className="text-foreground">Primary Color</Label>
-                  <div className="flex space-x-2 mt-2">
+                  <div className="flex items-center space-x-2">
                     <Input
                       type="color"
                       value={designSettings.primary_color || '#339999'}
-                      onChange={(e) => setDesignSettings(prev => ({ ...prev, primary_color: e.target.value }))}
-                      className="w-12 h-10 p-1 bg-gaming-dark border-gaming-border"
+                      onChange={(e) => {
+                        const newSettings = { ...designSettings, primary_color: e.target.value };
+                        setDesignSettings(newSettings);
+                        applyDesignSettings(newSettings);
+                      }}
+                      className="w-16 h-10 p-1 bg-gaming-dark border-gaming-border"
                     />
                     <Input
-                      value={designSettings.primary_color || ''}
-                      onChange={(e) => setDesignSettings(prev => ({ ...prev, primary_color: e.target.value }))}
-                      placeholder="#339999"
+                      value={designSettings.primary_color || '#339999'}
+                      onChange={(e) => {
+                        const newSettings = { ...designSettings, primary_color: e.target.value };
+                        setDesignSettings(newSettings);
+                        applyDesignSettings(newSettings);
+                      }}
                       className="bg-gaming-dark border-gaming-border text-foreground"
                     />
                   </div>
                 </div>
-
                 <div>
                   <Label className="text-foreground">Secondary Color</Label>
-                  <div className="flex space-x-2 mt-2">
+                  <div className="flex items-center space-x-2">
                     <Input
                       type="color"
                       value={designSettings.secondary_color || '#f0e68c'}
-                      onChange={(e) => setDesignSettings(prev => ({ ...prev, secondary_color: e.target.value }))}
-                      className="w-12 h-10 p-1 bg-gaming-dark border-gaming-border"
+                      onChange={(e) => {
+                        const newSettings = { ...designSettings, secondary_color: e.target.value };
+                        setDesignSettings(newSettings);
+                        applyDesignSettings(newSettings);
+                      }}
+                      className="w-16 h-10 p-1 bg-gaming-dark border-gaming-border"
                     />
                     <Input
-                      value={designSettings.secondary_color || ''}
-                      onChange={(e) => setDesignSettings(prev => ({ ...prev, secondary_color: e.target.value }))}
-                      placeholder="#f0e68c"
+                      value={designSettings.secondary_color || '#f0e68c'}
+                      onChange={(e) => {
+                        const newSettings = { ...designSettings, secondary_color: e.target.value };
+                        setDesignSettings(newSettings);
+                        applyDesignSettings(newSettings);
+                      }}
                       className="bg-gaming-dark border-gaming-border text-foreground"
                     />
                   </div>
                 </div>
-
                 <div>
                   <Label className="text-foreground">Accent Color</Label>
-                  <div className="flex space-x-2 mt-2">
+                  <div className="flex items-center space-x-2">
                     <Input
                       type="color"
                       value={designSettings.accent_color || '#00ccff'}
-                      onChange={(e) => setDesignSettings(prev => ({ ...prev, accent_color: e.target.value }))}
-                      className="w-12 h-10 p-1 bg-gaming-dark border-gaming-border"
+                      onChange={(e) => {
+                        const newSettings = { ...designSettings, accent_color: e.target.value };
+                        setDesignSettings(newSettings);
+                        applyDesignSettings(newSettings);
+                      }}
+                      className="w-16 h-10 p-1 bg-gaming-dark border-gaming-border"
                     />
                     <Input
-                      value={designSettings.accent_color || ''}
-                      onChange={(e) => setDesignSettings(prev => ({ ...prev, accent_color: e.target.value }))}
-                      placeholder="#00ccff"
+                      value={designSettings.accent_color || '#00ccff'}
+                      onChange={(e) => {
+                        const newSettings = { ...designSettings, accent_color: e.target.value };
+                        setDesignSettings(newSettings);
+                        applyDesignSettings(newSettings);
+                      }}
                       className="bg-gaming-dark border-gaming-border text-foreground"
                     />
                   </div>
                 </div>
-
                 <div>
                   <Label className="text-foreground">Background Color</Label>
-                  <div className="flex space-x-2 mt-2">
+                  <div className="flex items-center space-x-2">
                     <Input
                       type="color"
                       value={designSettings.background_color || '#1a1a1a'}
-                      onChange={(e) => setDesignSettings(prev => ({ ...prev, background_color: e.target.value }))}
-                      className="w-12 h-10 p-1 bg-gaming-dark border-gaming-border"
+                      onChange={(e) => {
+                        const newSettings = { ...designSettings, background_color: e.target.value };
+                        setDesignSettings(newSettings);
+                        applyDesignSettings(newSettings);
+                      }}
+                      className="w-16 h-10 p-1 bg-gaming-dark border-gaming-border"
                     />
                     <Input
-                      value={designSettings.background_color || ''}
-                      onChange={(e) => setDesignSettings(prev => ({ ...prev, background_color: e.target.value }))}
-                      placeholder="#1a1a1a"
+                      value={designSettings.background_color || '#1a1a1a'}
+                      onChange={(e) => {
+                        const newSettings = { ...designSettings, background_color: e.target.value };
+                        setDesignSettings(newSettings);
+                        applyDesignSettings(newSettings);
+                      }}
                       className="bg-gaming-dark border-gaming-border text-foreground"
                     />
                   </div>
                 </div>
-
                 <div>
                   <Label className="text-foreground">Text Color</Label>
-                  <div className="flex space-x-2 mt-2">
+                  <div className="flex items-center space-x-2">
                     <Input
                       type="color"
                       value={designSettings.text_color || '#f5f5dc'}
-                      onChange={(e) => setDesignSettings(prev => ({ ...prev, text_color: e.target.value }))}
-                      className="w-12 h-10 p-1 bg-gaming-dark border-gaming-border"
+                      onChange={(e) => {
+                        const newSettings = { ...designSettings, text_color: e.target.value };
+                        setDesignSettings(newSettings);
+                        applyDesignSettings(newSettings);
+                      }}
+                      className="w-16 h-10 p-1 bg-gaming-dark border-gaming-border"
                     />
                     <Input
-                      value={designSettings.text_color || ''}
-                      onChange={(e) => setDesignSettings(prev => ({ ...prev, text_color: e.target.value }))}
-                      placeholder="#f5f5dc"
+                      value={designSettings.text_color || '#f5f5dc'}
+                      onChange={(e) => {
+                        const newSettings = { ...designSettings, text_color: e.target.value };
+                        setDesignSettings(newSettings);
+                        applyDesignSettings(newSettings);
+                      }}
+                      className="bg-gaming-dark border-gaming-border text-foreground"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <Label className="text-foreground">Border Color</Label>
+                  <div className="flex items-center space-x-2">
+                    <Input
+                      type="color"
+                      value={designSettings.border_color || '#2a2a2a'}
+                      onChange={(e) => {
+                        const newSettings = { ...designSettings, border_color: e.target.value };
+                        setDesignSettings(newSettings);
+                        applyDesignSettings(newSettings);
+                      }}
+                      className="w-16 h-10 p-1 bg-gaming-dark border-gaming-border"
+                    />
+                    <Input
+                      value={designSettings.border_color || '#2a2a2a'}
+                      onChange={(e) => {
+                        const newSettings = { ...designSettings, border_color: e.target.value };
+                        setDesignSettings(newSettings);
+                        applyDesignSettings(newSettings);
+                      }}
+                      className="bg-gaming-dark border-gaming-border text-foreground"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <Label className="text-foreground">Card Background</Label>
+                  <div className="flex items-center space-x-2">
+                    <Input
+                      type="color"
+                      value={designSettings.card_color || '#1e1e1e'}
+                      onChange={(e) => {
+                        const newSettings = { ...designSettings, card_color: e.target.value };
+                        setDesignSettings(newSettings);
+                        applyDesignSettings(newSettings);
+                      }}
+                      className="w-16 h-10 p-1 bg-gaming-dark border-gaming-border"
+                    />
+                    <Input
+                      value={designSettings.card_color || '#1e1e1e'}
+                      onChange={(e) => {
+                        const newSettings = { ...designSettings, card_color: e.target.value };
+                        setDesignSettings(newSettings);
+                        applyDesignSettings(newSettings);
+                      }}
+                      className="bg-gaming-dark border-gaming-border text-foreground"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <Label className="text-foreground">Muted Color</Label>
+                  <div className="flex items-center space-x-2">
+                    <Input
+                      type="color"
+                      value={designSettings.muted_color || '#404040'}
+                      onChange={(e) => {
+                        const newSettings = { ...designSettings, muted_color: e.target.value };
+                        setDesignSettings(newSettings);
+                        applyDesignSettings(newSettings);
+                      }}
+                      className="w-16 h-10 p-1 bg-gaming-dark border-gaming-border"
+                    />
+                    <Input
+                      value={designSettings.muted_color || '#404040'}
+                      onChange={(e) => {
+                        const newSettings = { ...designSettings, muted_color: e.target.value };
+                        setDesignSettings(newSettings);
+                        applyDesignSettings(newSettings);
+                      }}
+                      className="bg-gaming-dark border-gaming-border text-foreground"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <Label className="text-foreground">Destructive Color</Label>
+                  <div className="flex items-center space-x-2">
+                    <Input
+                      type="color"
+                      value={designSettings.destructive_color || '#ef4444'}
+                      onChange={(e) => {
+                        const newSettings = { ...designSettings, destructive_color: e.target.value };
+                        setDesignSettings(newSettings);
+                        applyDesignSettings(newSettings);
+                      }}
+                      className="w-16 h-10 p-1 bg-gaming-dark border-gaming-border"
+                    />
+                    <Input
+                      value={designSettings.destructive_color || '#ef4444'}
+                      onChange={(e) => {
+                        const newSettings = { ...designSettings, destructive_color: e.target.value };
+                        setDesignSettings(newSettings);
+                        applyDesignSettings(newSettings);
+                      }}
                       className="bg-gaming-dark border-gaming-border text-foreground"
                     />
                   </div>
@@ -426,14 +621,12 @@ const DesignManager = () => {
               </div>
             </Card>
           </TabsContent>
-
           <TabsContent value="typography" className="space-y-6">
             <Card className="p-4 bg-gaming-darker border-gaming-border">
               <h3 className="text-lg font-semibold mb-4 text-foreground flex items-center">
                 <Type className="h-5 w-5 mr-2 text-neon-teal" />
                 Typography Settings
               </h3>
-              
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <Label className="text-foreground">Primary Font (Headings)</Label>
@@ -445,7 +638,6 @@ const DesignManager = () => {
                   />
                   <p className="text-sm text-muted-foreground mt-1">e.g., Orbitron, Arial, sans-serif</p>
                 </div>
-
                 <div>
                   <Label className="text-foreground">Secondary Font (Body Text)</Label>
                   <Input
@@ -459,12 +651,11 @@ const DesignManager = () => {
               </div>
             </Card>
           </TabsContent>
-
           <TabsContent value="layout" className="space-y-6">
             <Card className="p-4 bg-gaming-darker border-gaming-border">
               <h3 className="text-lg font-semibold mb-4 text-foreground">Layout & Effects</h3>
-              
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {/* Layout Fields */}
                 <div>
                   <Label className="text-foreground">Border Radius</Label>
                   <Input
@@ -474,7 +665,6 @@ const DesignManager = () => {
                     className="bg-gaming-dark border-gaming-border text-foreground"
                   />
                 </div>
-
                 <div>
                   <Label className="text-foreground">Shadow Intensity</Label>
                   <select
@@ -488,7 +678,6 @@ const DesignManager = () => {
                     <option value="heavy">Heavy</option>
                   </select>
                 </div>
-
                 <div>
                   <Label className="text-foreground">Animation Speed</Label>
                   <select
@@ -505,21 +694,19 @@ const DesignManager = () => {
               </div>
             </Card>
           </TabsContent>
-
           <TabsContent value="advanced" className="space-y-6">
             <Card className="p-4 bg-gaming-darker border-gaming-border">
               <h3 className="text-lg font-semibold mb-4 text-foreground">Advanced Customization</h3>
-              
               <div>
                 <Label className="text-foreground">Custom CSS</Label>
                 <Textarea
                   value={designSettings.custom_css || ''}
-                  onChange={(e) => setDesignSettings(prev => ({ ...prev, custom_css: e.target.value }))}
-                  placeholder="/* Add your custom CSS here */
-.custom-element {
-  background: linear-gradient(45deg, #ff6b6b, #4ecdc4);
-  border-radius: 10px;
-}"
+                  onChange={e => {
+                    const custom_css = e.target.value;
+                    setDesignSettings(prev => ({ ...prev, custom_css }));
+                    updateCustomCSS(custom_css); // live update
+                  }}
+                  placeholder="/* Add your custom CSS here */"
                   rows={12}
                   className="bg-gaming-dark border-gaming-border text-foreground font-mono text-sm"
                 />

@@ -232,6 +232,113 @@ export type Database = {
         }
         Relationships: []
       }
+      chat_banned_users: {
+        Row: {
+          banned_at: string
+          banned_by: string
+          created_at: string
+          id: string
+          ip_address: unknown | null
+          reason: string | null
+          user_id: string | null
+          visitor_email: string | null
+          visitor_name: string | null
+        }
+        Insert: {
+          banned_at?: string
+          banned_by: string
+          created_at?: string
+          id?: string
+          ip_address?: unknown | null
+          reason?: string | null
+          user_id?: string | null
+          visitor_email?: string | null
+          visitor_name?: string | null
+        }
+        Update: {
+          banned_at?: string
+          banned_by?: string
+          created_at?: string
+          id?: string
+          ip_address?: unknown | null
+          reason?: string | null
+          user_id?: string | null
+          visitor_email?: string | null
+          visitor_name?: string | null
+        }
+        Relationships: []
+      }
+      chat_messages: {
+        Row: {
+          created_at: string
+          id: string
+          message: string
+          sender_id: string | null
+          sender_type: string
+          session_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          message: string
+          sender_id?: string | null
+          sender_type?: string
+          session_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          message?: string
+          sender_id?: string | null
+          sender_type?: string
+          session_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_messages_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "chat_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      chat_sessions: {
+        Row: {
+          assigned_to: string | null
+          created_at: string
+          ended_at: string | null
+          id: string
+          status: string
+          updated_at: string
+          user_id: string | null
+          visitor_email: string | null
+          visitor_name: string | null
+        }
+        Insert: {
+          assigned_to?: string | null
+          created_at?: string
+          ended_at?: string | null
+          id?: string
+          status?: string
+          updated_at?: string
+          user_id?: string | null
+          visitor_email?: string | null
+          visitor_name?: string | null
+        }
+        Update: {
+          assigned_to?: string | null
+          created_at?: string
+          ended_at?: string | null
+          id?: string
+          status?: string
+          updated_at?: string
+          user_id?: string | null
+          visitor_email?: string | null
+          visitor_name?: string | null
+        }
+        Relationships: []
+      }
       email_templates: {
         Row: {
           body: string

@@ -27,7 +27,8 @@ import {
   Activity,
   Home,
   UserPlus,
-  Palette
+  Palette,
+  MessageSquare
 } from "lucide-react";
 
 interface StaffSidebarProps {
@@ -59,6 +60,7 @@ const navigationItems = [
       { id: "staff", label: "Staff", icon: UserCheck },
       { id: "role-management", label: "Role Management", icon: Shield },
       { id: "users", label: "Users", icon: Users },
+      { id: "chat", label: "Live Chat", icon: MessageSquare },
       { id: "team", label: "Team Page", icon: UserPlus },
       { id: "partners", label: "Partners", icon: Globe },
     ]

@@ -343,133 +343,192 @@ const TwitchStreamersManager = () => {
     );
   }
 
-  return (
-    <Card className="p-6 bg-gaming-card border-gaming-border">
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center space-x-2">
-          <Users className="h-5 w-5 text-neon-purple" />
-          <h2 className="text-xl font-semibold text-foreground">Twitch Streamers</h2>
-        </div>
-        <Dialog open={isDialogOpen} onOpenChange={handleDialogClose}>
-          <DialogTrigger asChild>
-            <Button onClick={() => { 
-              console.log('Add Streamer button clicked');
-              setEditingStreamer(null); 
-              resetForm(); 
-              setIsDialogOpen(true); 
-            }} className="bg-neon-purple hover:bg-neon-purple/80">
-              <Plus className="h-4 w-4 mr-2" />
-              Add Streamer
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="bg-gaming-card border-gaming-border">
-            <DialogHeader>
-              <DialogTitle className="text-foreground">
-                {editingStreamer ? 'Edit Streamer' : 'Add New Streamer'}
-              </DialogTitle>
-              <DialogDescription className="text-muted-foreground">
-                {editingStreamer ? 'Update the streamer information.' : 'Add a new Twitch streamer to the live page.'}
-              </DialogDescription>
-            </DialogHeader>
-            <form onSubmit={(e) => {
-              console.log('Form onSubmit triggered');
+return (
+  <Card className="p-6 bg-gaming-card border-gaming-border">
+    <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center space-x-2">
+        <Users className="h-5 w-5 text-neon-purple" />
+        <h2 className="text-xl font-semibold text-foreground">Twitch Streamers</h2>
+      </div>
+      
+      {/* Dialog styret udelukkende af state */}
+      <Dialog
+        open={isDialogOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            handleDialogClose();
+          } else {
+            setIsDialogOpen(true);
+          }
+        }}
+      >
+        {/* Knap direkte, ingen DialogTrigger */}
+        <Button
+          onClick={() => {
+            console.log("Add Streamer button clicked");
+            setEditingStreamer(null);
+            resetForm();
+            setIsDialogOpen(true);
+          }}
+          className="bg-neon-purple hover:bg-neon-purple/80"
+        >
+          <Plus className="h-4 w-4 mr-2" />
+          Add Streamer
+        </Button>
+
+        <DialogContent className="bg-gaming-card border-gaming-border">
+          <DialogHeader>
+            <DialogTitle className="text-foreground">
+              {editingStreamer ? "Edit Streamer" : "Add New Streamer"}
+            </DialogTitle>
+            <DialogDescription className="text-muted-foreground">
+              {editingStreamer
+                ? "Update the streamer information."
+                : "Add a new Twitch streamer to the live page."}
+            </DialogDescription>
+          </DialogHeader>
+
+          <form
+            onSubmit={(e) => {
+              console.log("Form onSubmit triggered");
               handleSubmit(e);
-            }} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="username" className="text-foreground">Username</Label>
-                  <Input
-                    id="username"
-                    value={formData.username}
-                    onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-                    placeholder="Display username"
-                    className="bg-gaming-dark border-gaming-border text-foreground"
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="twitch_username" className="text-foreground">Twitch Username</Label>
-                  <Input
-                    id="twitch_username"
-                    value={formData.twitch_username}
-                    onChange={(e) => setFormData({ ...formData, twitch_username: e.target.value })}
-                    placeholder="twitch_username"
-                    className="bg-gaming-dark border-gaming-border text-foreground"
-                    required
-                  />
-                </div>
-              </div>
+            }}
+            className="space-y-4"
+          >
+            <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="display_name" className="text-foreground">Display Name (Optional)</Label>
+                <Label htmlFor="username" className="text-foreground">
+                  Username
+                </Label>
                 <Input
-                  id="display_name"
-                  value={formData.display_name}
-                  onChange={(e) => setFormData({ ...formData, display_name: e.target.value })}
-                  placeholder="Custom display name"
+                  id="username"
+                  value={formData.username}
+                  onChange={(e) =>
+                    setFormData({ ...formData, username: e.target.value })
+                  }
+                  placeholder="Display username"
                   className="bg-gaming-dark border-gaming-border text-foreground"
+                  required
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="avatar_url" className="text-foreground">Avatar URL (Optional)</Label>
+                <Label htmlFor="twitch_username" className="text-foreground">
+                  Twitch Username
+                </Label>
                 <Input
-                  id="avatar_url"
-                  value={formData.avatar_url}
-                  onChange={(e) => setFormData({ ...formData, avatar_url: e.target.value })}
-                  placeholder="https://example.com/avatar.jpg"
+                  id="twitch_username"
+                  value={formData.twitch_username}
+                  onChange={(e) =>
+                    setFormData({ ...formData, twitch_username: e.target.value })
+                  }
+                  placeholder="twitch_username"
                   className="bg-gaming-dark border-gaming-border text-foreground"
-                  type="url"
+                  required
                 />
               </div>
-              <div className="flex items-center space-x-2">
-                <Switch
-                  id="is_active"
-                  checked={formData.is_active}
-                  onCheckedChange={(checked) => setFormData({ ...formData, is_active: checked })}
-                />
-                <Label htmlFor="is_active" className="text-foreground">Active</Label>
-              </div>
-              <div className="flex justify-end space-x-3 pt-4">
-                <Button type="button" variant="outline" onClick={handleDialogClose}>
-                  Cancel
-                </Button>
-                <Button type="submit" className="bg-neon-purple hover:bg-neon-purple/80">
-                  {editingStreamer ? 'Update' : 'Add'} Streamer
-                </Button>
-              </div>
-            </form>
-          </DialogContent>
-        </Dialog>
-      </div>
-      {/* LIVE STREAM KORT */}
-      <h2 className="text-lg font-semibold mb-4">Live Stream Previews</h2>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-10">
-          {streamers
-            .filter((s) => s.is_active)
-            .map((streamer) => (
-              <StreamerCard
-                key={streamer.id}
-                streamer={streamer}
-                streamData={streamData[streamer.twitch_username] || {}}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="display_name" className="text-foreground">
+                Display Name (Optional)
+              </Label>
+              <Input
+                id="display_name"
+                value={formData.display_name}
+                onChange={(e) =>
+                  setFormData({ ...formData, display_name: e.target.value })
+                }
+                placeholder="Custom display name"
+                className="bg-gaming-dark border-gaming-border text-foreground"
               />
-          ))}
-      </div>
-      {/* DRAG AND DROP ADMIN LIST */}
-      <h2 className="text-lg font-semibold mb-2">Sort / Edit Streamers</h2>
-      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-        <SortableContext items={streamers.map((s) => s.id)} strategy={verticalListSortingStrategy}>
-          {streamers.map((streamer) => (
-            <SortableStreamerRow
-              key={streamer.id}
-              streamer={streamer}
-              onEdit={handleEdit}
-              onDelete={handleDelete}
-              toggleActive={toggleActive}
-            />
-          ))}
-        </SortableContext>
-      </DndContext>
-    </Card>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="avatar_url" className="text-foreground">
+                Avatar URL (Optional)
+              </Label>
+              <Input
+                id="avatar_url"
+                value={formData.avatar_url}
+                onChange={(e) =>
+                  setFormData({ ...formData, avatar_url: e.target.value })
+                }
+                placeholder="https://example.com/avatar.jpg"
+                className="bg-gaming-dark border-gaming-border text-foreground"
+                type="url"
+              />
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <Switch
+                id="is_active"
+                checked={formData.is_active}
+                onCheckedChange={(checked) =>
+                  setFormData({ ...formData, is_active: checked })
+                }
+              />
+              <Label htmlFor="is_active" className="text-foreground">
+                Active
+              </Label>
+            </div>
+
+            <div className="flex justify-end space-x-3 pt-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleDialogClose}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                className="bg-neon-purple hover:bg-neon-purple/80"
+              >
+                {editingStreamer ? "Update" : "Add"} Streamer
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+    </div>
+
+    {/* LIVE STREAM KORT */}
+    <h2 className="text-lg font-semibold mb-4">Live Stream Previews</h2>
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-10">
+      {streamers
+        .filter((s) => s.is_active)
+        .map((streamer) => (
+          <StreamerCard
+            key={streamer.id}
+            streamer={streamer}
+            streamData={streamData[streamer.twitch_username] || {}}
+          />
+        ))}
+    </div>
+
+    {/* DRAG AND DROP ADMIN LIST */}
+    <h2 className="text-lg font-semibold mb-2">Sort / Edit Streamers</h2>
+    <DndContext
+      sensors={sensors}
+      collisionDetection={closestCenter}
+      onDragEnd={handleDragEnd}
+    >
+      <SortableContext
+        items={streamers.map((s) => s.id)}
+        strategy={verticalListSortingStrategy}
+      >
+        {streamers.map((streamer) => (
+          <SortableStreamerRow
+            key={streamer.id}
+            streamer={streamer}
+            onEdit={handleEdit}
+            onDelete={handleDelete}
+            toggleActive={toggleActive}
+          />
+        ))}
+      </SortableContext>
+    </DndContext>
+  </Card>
   );
 };
-
 export default TwitchStreamersManager;
