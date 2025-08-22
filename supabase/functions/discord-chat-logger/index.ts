@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.55.0';
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -23,9 +24,30 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
-    const webhookUrl = Deno.env.get("DISCORD_WEBHOOK_URL");
+    // Initialize Supabase client
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Get Discord webhook URL from settings
+    const { data: settingsData, error: settingsError } = await supabase
+      .from('server_settings')
+      .select('setting_value')
+      .eq('setting_key', 'chat_settings')
+      .single();
+
+    if (settingsError) {
+      console.error('Error fetching chat settings:', settingsError);
+      throw new Error('Failed to fetch chat settings');
+    }
+
+    const webhookUrl = settingsData?.setting_value?.discord_webhook_url;
     if (!webhookUrl) {
-      throw new Error('DISCORD_WEBHOOK_URL not configured');
+      console.log('Discord webhook URL not configured in chat settings');
+      return new Response(JSON.stringify({ success: false, message: 'Discord webhook not configured' }), {
+        status: 200,
+        headers: { "Content-Type": "application/json", ...corsHeaders },
+      });
     }
 
     const { type, sessionId, visitorName, visitorEmail, staffName, banReason, ipAddress }: ChatLogRequest = await req.json();

@@ -46,6 +46,7 @@ const LiveChatManager = () => {
     loadChatStats();
     loadBannedUsers();
     subscribeToStats();
+    subscribeToBannedUsers();
   }, []);
 
   const loadSettings = async () => {
@@ -97,6 +98,27 @@ const LiveChatManager = () => {
         },
         () => {
           loadChatStats();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  };
+
+  const subscribeToBannedUsers = () => {
+    const channel = supabase
+      .channel('banned_users')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'chat_banned_users'
+        },
+        () => {
+          loadBannedUsers();
         }
       )
       .subscribe();
