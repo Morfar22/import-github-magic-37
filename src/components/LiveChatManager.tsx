@@ -8,13 +8,24 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { MessageSquare, Settings, Users, Save } from "lucide-react";
+import { MessageSquare, Settings, Users, Save, UserX, Shield } from "lucide-react";
 import LiveChatSupport from "./LiveChatSupport";
 
 interface ChatSettings {
   enabled: boolean;
   auto_assign: boolean;
   max_concurrent_chats: number;
+  discord_webhook_url?: string;
+}
+
+interface BannedUser {
+  id: string;
+  visitor_name?: string;
+  visitor_email?: string;
+  ip_address?: any;
+  reason?: string;
+  banned_by: string;
+  banned_at: string;
 }
 
 const LiveChatManager = () => {
@@ -26,11 +37,14 @@ const LiveChatManager = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [waitingChats, setWaitingChats] = useState(0);
   const [activeChats, setActiveChats] = useState(0);
+  const [bannedUsers, setBannedUsers] = useState<BannedUser[]>([]);
+  const [isLoadingBanned, setIsLoadingBanned] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
     loadSettings();
     loadChatStats();
+    loadBannedUsers();
     subscribeToStats();
   }, []);
 
@@ -92,6 +106,48 @@ const LiveChatManager = () => {
     };
   };
 
+  const loadBannedUsers = async () => {
+    setIsLoadingBanned(true);
+    try {
+      const { data, error } = await supabase
+        .from('chat_banned_users')
+        .select('*')
+        .order('banned_at', { ascending: false });
+
+      if (error) throw error;
+      setBannedUsers(data || []);
+    } catch (error) {
+      console.error('Error loading banned users:', error);
+    } finally {
+      setIsLoadingBanned(false);
+    }
+  };
+
+  const unbanUser = async (userId: string) => {
+    try {
+      const { error } = await supabase
+        .from('chat_banned_users')
+        .delete()
+        .eq('id', userId);
+
+      if (error) throw error;
+
+      toast({
+        title: "User Unbanned",
+        description: "User has been successfully unbanned from live chat.",
+      });
+      
+      loadBannedUsers();
+    } catch (error) {
+      console.error('Error unbanning user:', error);
+      toast({
+        title: "Error",
+        description: "Failed to unban user",
+        variant: "destructive"
+      });
+    }
+  };
+
   const saveSettings = async () => {
     setIsLoading(true);
     try {
@@ -144,9 +200,10 @@ const LiveChatManager = () => {
         </div>
 
         <Tabs defaultValue="support" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="support">Live Support</TabsTrigger>
             <TabsTrigger value="settings">Settings</TabsTrigger>
+            <TabsTrigger value="banned">Banned Users</TabsTrigger>
             <TabsTrigger value="analytics">Analytics</TabsTrigger>
           </TabsList>
 
@@ -212,6 +269,25 @@ const LiveChatManager = () => {
                   />
                 </div>
 
+                <div>
+                  <Label className="text-foreground font-medium">Discord Webhook URL</Label>
+                  <p className="text-sm text-muted-foreground mb-2">
+                    Discord webhook URL for logging chat events
+                  </p>
+                  <Input
+                    type="url"
+                    placeholder="https://discord.com/api/webhooks/..."
+                    value={settings.discord_webhook_url || ''}
+                    onChange={(e) => 
+                      setSettings(prev => ({ 
+                        ...prev, 
+                        discord_webhook_url: e.target.value 
+                      }))
+                    }
+                    className="bg-gaming-dark border-gaming-border"
+                  />
+                </div>
+
                 <Button
                   onClick={saveSettings}
                   disabled={isLoading}
@@ -221,6 +297,68 @@ const LiveChatManager = () => {
                   {isLoading ? 'Saving...' : 'Save Settings'}
                 </Button>
               </div>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="banned" className="space-y-6">
+            <Card className="p-4 bg-gaming-darker border-gaming-border">
+              <h3 className="text-lg font-semibold mb-4 text-foreground flex items-center">
+                <Shield className="h-5 w-5 mr-2 text-red-500" />
+                Banned Users Management
+              </h3>
+              
+              {isLoadingBanned ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  Loading banned users...
+                </div>
+              ) : bannedUsers.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  No banned users found
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {bannedUsers.map((user) => (
+                    <div key={user.id} className="p-4 bg-gaming-dark border border-gaming-border rounded-lg">
+                      <div className="flex items-center justify-between">
+                        <div className="space-y-2">
+                          <div className="flex items-center space-x-2">
+                            <UserX className="h-4 w-4 text-red-500" />
+                            <span className="font-medium text-foreground">
+                              {user.visitor_name || 'Anonymous User'}
+                            </span>
+                          </div>
+                          {user.visitor_email && (
+                            <p className="text-sm text-muted-foreground">
+                              Email: {user.visitor_email}
+                            </p>
+                          )}
+                          {user.ip_address && (
+                            <p className="text-sm text-muted-foreground">
+                              IP: {user.ip_address}
+                            </p>
+                          )}
+                          {user.reason && (
+                            <p className="text-sm text-muted-foreground">
+                              Reason: {user.reason}
+                            </p>
+                          )}
+                          <p className="text-xs text-muted-foreground">
+                            Banned: {new Date(user.banned_at).toLocaleString()}
+                          </p>
+                        </div>
+                        <Button
+                          onClick={() => unbanUser(user.id)}
+                          variant="outline"
+                          size="sm"
+                          className="border-green-500 text-green-500 hover:bg-green-500 hover:text-white"
+                        >
+                          Unban
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </Card>
           </TabsContent>
 
