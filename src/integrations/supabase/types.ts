@@ -14,41 +14,6 @@ export type Database = {
   }
   public: {
     Tables: {
-      application_actions: {
-        Row: {
-          action: string
-          application_id: string
-          created_at: string
-          id: string
-          notes: string | null
-          staff_id: string
-        }
-        Insert: {
-          action: string
-          application_id: string
-          created_at?: string
-          id?: string
-          notes?: string | null
-          staff_id: string
-        }
-        Update: {
-          action?: string
-          application_id?: string
-          created_at?: string
-          id?: string
-          notes?: string | null
-          staff_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "application_actions_application_id_fkey"
-            columns: ["application_id"]
-            isOneToOne: false
-            referencedRelation: "applications"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       application_rate_limits: {
         Row: {
           application_count: number
@@ -114,9 +79,7 @@ export type Database = {
       }
       applications: {
         Row: {
-          age: number | null
           application_type_id: string
-          character_backstory: string | null
           closed: boolean
           closed_at: string | null
           closed_by: string | null
@@ -124,20 +87,18 @@ export type Database = {
           discord_name: string | null
           discord_tag: string | null
           fivem_name: string | null
-          form_data: Json | null
+          form_data: Json
           id: string
-          review_notes: string | null
+          notes: string | null
+          reviewed_at: string | null
           reviewed_by: string | null
-          rp_experience: string | null
-          status: string
+          status: string | null
           steam_name: string | null
           updated_at: string
           user_id: string
         }
         Insert: {
-          age?: number | null
           application_type_id: string
-          character_backstory?: string | null
           closed?: boolean
           closed_at?: string | null
           closed_by?: string | null
@@ -145,20 +106,18 @@ export type Database = {
           discord_name?: string | null
           discord_tag?: string | null
           fivem_name?: string | null
-          form_data?: Json | null
+          form_data?: Json
           id?: string
-          review_notes?: string | null
+          notes?: string | null
+          reviewed_at?: string | null
           reviewed_by?: string | null
-          rp_experience?: string | null
-          status?: string
+          status?: string | null
           steam_name?: string | null
           updated_at?: string
           user_id: string
         }
         Update: {
-          age?: number | null
           application_type_id?: string
-          character_backstory?: string | null
           closed?: boolean
           closed_at?: string | null
           closed_by?: string | null
@@ -166,12 +125,12 @@ export type Database = {
           discord_name?: string | null
           discord_tag?: string | null
           fivem_name?: string | null
-          form_data?: Json | null
+          form_data?: Json
           id?: string
-          review_notes?: string | null
+          notes?: string | null
+          reviewed_at?: string | null
           reviewed_by?: string | null
-          rp_experience?: string | null
-          status?: string
+          status?: string | null
           steam_name?: string | null
           updated_at?: string
           user_id?: string
@@ -182,13 +141,6 @@ export type Database = {
             columns: ["application_type_id"]
             isOneToOne: false
             referencedRelation: "application_types"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "applications_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -274,24 +226,30 @@ export type Database = {
           id: string
           message: string
           sender_id: string | null
+          sender_name: string | null
           sender_type: string
           session_id: string
+          updated_at: string
         }
         Insert: {
           created_at?: string
           id?: string
           message: string
           sender_id?: string | null
-          sender_type?: string
+          sender_name?: string | null
+          sender_type: string
           session_id: string
+          updated_at?: string
         }
         Update: {
           created_at?: string
           id?: string
           message?: string
           sender_id?: string | null
+          sender_name?: string | null
           sender_type?: string
           session_id?: string
+          updated_at?: string
         }
         Relationships: [
           {
@@ -409,11 +367,12 @@ export type Database = {
         Row: {
           created_at: string
           id: string
-          last_updated: string
+          last_updated: string | null
           max_players: number
           ping_ms: number
           players_online: number
           queue_count: number
+          recorded_at: string
           server_id: string
           server_online: boolean
           updated_at: string
@@ -422,11 +381,12 @@ export type Database = {
         Insert: {
           created_at?: string
           id?: string
-          last_updated?: string
+          last_updated?: string | null
           max_players?: number
           ping_ms?: number
           players_online?: number
           queue_count?: number
+          recorded_at?: string
           server_id: string
           server_online?: boolean
           updated_at?: string
@@ -435,11 +395,12 @@ export type Database = {
         Update: {
           created_at?: string
           id?: string
-          last_updated?: string
+          last_updated?: string | null
           max_players?: number
           ping_ms?: number
           players_online?: number
           queue_count?: number
+          recorded_at?: string
           server_id?: string
           server_online?: boolean
           updated_at?: string
@@ -455,11 +416,108 @@ export type Database = {
           },
         ]
       }
+      laws: {
+        Row: {
+          category: string
+          created_at: string
+          created_by: string | null
+          description: string
+          fine_amount: number | null
+          id: string
+          is_active: boolean
+          jail_time_minutes: number | null
+          order_index: number
+          severity_level: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          category?: string
+          created_at?: string
+          created_by?: string | null
+          description: string
+          fine_amount?: number | null
+          id?: string
+          is_active?: boolean
+          jail_time_minutes?: number | null
+          order_index?: number
+          severity_level?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string
+          fine_amount?: number | null
+          id?: string
+          is_active?: boolean
+          jail_time_minutes?: number | null
+          order_index?: number
+          severity_level?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      packages: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          currency: string
+          description: string | null
+          features: Json | null
+          id: string
+          image_url: string | null
+          interval: string
+          is_active: boolean
+          name: string
+          order_index: number
+          price_amount: number
+          stripe_price_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          description?: string | null
+          features?: Json | null
+          id?: string
+          image_url?: string | null
+          interval?: string
+          is_active?: boolean
+          name: string
+          order_index?: number
+          price_amount: number
+          stripe_price_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          description?: string | null
+          features?: Json | null
+          id?: string
+          image_url?: string | null
+          interval?: string
+          is_active?: boolean
+          name?: string
+          order_index?: number
+          price_amount?: number
+          stripe_price_id?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       partners: {
         Row: {
           created_at: string
           created_by: string | null
           description: string | null
+          discount_code: string | null
           id: string
           is_active: boolean
           logo_url: string | null
@@ -472,6 +530,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           description?: string | null
+          discount_code?: string | null
           id?: string
           is_active?: boolean
           logo_url?: string | null
@@ -484,6 +543,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           description?: string | null
+          discount_code?: string | null
           id?: string
           is_active?: boolean
           logo_url?: string | null
@@ -589,33 +649,30 @@ export type Database = {
       }
       role_permissions: {
         Row: {
-          granted_at: string
-          granted_by: string | null
+          created_at: string
           id: string
-          permission_name: string
+          permission_id: string
           role_id: string
         }
         Insert: {
-          granted_at?: string
-          granted_by?: string | null
+          created_at?: string
           id?: string
-          permission_name: string
+          permission_id: string
           role_id: string
         }
         Update: {
-          granted_at?: string
-          granted_by?: string | null
+          created_at?: string
           id?: string
-          permission_name?: string
+          permission_id?: string
           role_id?: string
         }
         Relationships: [
           {
-            foreignKeyName: "role_permissions_permission_name_fkey"
-            columns: ["permission_name"]
+            foreignKeyName: "role_permissions_permission_id_fkey"
+            columns: ["permission_id"]
             isOneToOne: false
             referencedRelation: "permissions"
-            referencedColumns: ["name"]
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "role_permissions_role_id_fkey"
@@ -800,6 +857,53 @@ export type Database = {
         }
         Relationships: []
       }
+      subscribers: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+          package_id: string | null
+          stripe_customer_id: string | null
+          subscribed: boolean
+          subscription_end: string | null
+          subscription_tier: string | null
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id?: string
+          package_id?: string | null
+          stripe_customer_id?: string | null
+          subscribed?: boolean
+          subscription_end?: string | null
+          subscription_tier?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+          package_id?: string | null
+          stripe_customer_id?: string | null
+          subscribed?: boolean
+          subscription_end?: string | null
+          subscription_tier?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subscribers_package_id_fkey"
+            columns: ["package_id"]
+            isOneToOne: false
+            referencedRelation: "packages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       team_members: {
         Row: {
           bio: string | null
@@ -976,33 +1080,40 @@ export type Database = {
     }
     Functions: {
       analytics_query: {
-        Args: { query: string }
-        Returns: {
-          result: Json
-        }[]
+        Args: { query: string } | { query_params?: Json }
+        Returns: Json
       }
-      get_user_id_by_email: {
-        Args: { _email: string }
+      get_current_user_role: {
+        Args: Record<PropertyKey, never>
         Returns: string
       }
       has_role: {
         Args: {
-          _role: Database["public"]["Enums"]["app_role"]
-          _user_id: string
+          check_user_uuid: string
+          target_role: Database["public"]["Enums"]["app_role"]
         }
         Returns: boolean
       }
+      is_admin: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
+      is_moderator_or_above: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
       is_staff: {
-        Args: { _user_id: string }
+        Args: { check_user_uuid: string }
         Returns: boolean
       }
-      user_has_any_role: {
-        Args: { _user_id: string }
-        Returns: boolean
-      }
-      user_has_permission: {
-        Args: { _permission: string; _user_id: string }
-        Returns: boolean
+      log_analytics_event: {
+        Args: {
+          event_type: string
+          metadata?: Json
+          resource_id?: string
+          resource_type?: string
+        }
+        Returns: string
       }
     }
     Enums: {
