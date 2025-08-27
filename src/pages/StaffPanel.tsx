@@ -47,6 +47,8 @@ import RulesManager from "@/components/RulesManager";
 import StaffManager from "@/components/StaffManager";
 import UserManagementSection from "@/components/UserManagementSection";
 import TeamManager from "@/components/TeamManager";
+import ServerManager from "@/components/ServerManager";
+import EmailTest from "@/components/EmailTest";
 import PartnerManager from "@/components/PartnerManager";
 import NavbarManager from "@/components/NavbarManager";
 import ServerStatsManager from "@/components/ServerStatsManager";
@@ -63,6 +65,10 @@ import { DeploymentSettings } from "@/components/DeploymentSettings";
 import RoleManagement from "@/components/RoleManagement";
 import LiveChatManager from "@/components/LiveChatManager";
 import DesignManager from "@/components/DesignManager";
+import ServerInfoCard from "@/components/ServerInfoCard";
+import { PackageManager } from "@/components/PackageManager";
+import { SubscriptionOverview } from "@/components/SubscriptionOverview";
+import LawsManager from "@/components/LawsManager";
 
 const DiscordLogsManager = () => {
   const [discordSettings, setDiscordSettings] = useState<any>({});
@@ -141,27 +147,51 @@ const DiscordLogsManager = () => {
 
   const testDiscordLog = async (type: string) => {
     try {
-      await supabase.functions.invoke('discord-logger', {
+      let testData = {};
+      
+      if (type === 'purchase_completed') {
+        testData = {
+          customerEmail: 'test@example.com',
+          customerName: 'Test Customer',
+          username: 'TestUser',
+          packageName: 'Test Package',
+          price: 4999, // $49.99 in cents
+          currency: 'USD'
+        };
+      } else {
+        testData = {
+          staff_name: 'Test Staff',
+          action: 'Test Action',
+          target: 'Test Target',
+          reason: 'Testing Discord logging system'
+        };
+      }
+      
+      console.log('Sending test log:', { type, testData });
+      
+      const { data, error } = await supabase.functions.invoke('discord-logger', {
         body: {
           type,
-          data: {
-            staff_name: 'Test Staff',
-            action: 'Test Action',
-            target: 'Test Target',
-            reason: 'Testing Discord logging system'
-          }
+          data: testData
         }
       });
       
+      if (error) {
+        console.error('Function invoke error:', error);
+        throw error;
+      }
+      
+      console.log('Discord logger response:', data);
+      
       toast({
-        title: "Test Sent",
-        description: `Test ${type} log sent to Discord successfully.`,
+        title: "Test Sent Successfully",
+        description: `Test ${type} log sent to Discord. Check your Discord channel for the message.`,
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error sending test log:', error);
       toast({
-        title: "Test Failed",
-        description: "Failed to send test log to Discord.",
+        title: "Test Failed", 
+        description: `Failed to send test log: ${error.message || 'Unknown error'}`,
         variant: "destructive",
       });
     }
@@ -217,6 +247,19 @@ const DiscordLogsManager = () => {
           </div>
           
           <div className="space-y-2">
+            <Label className="text-foreground">Packages Webhook</Label>
+            <Input
+              value={discordSettings.packages_webhook || ''}
+              onChange={(e) => setDiscordSettings({
+                ...discordSettings,
+                packages_webhook: e.target.value
+              })}
+              placeholder="Discord webhook URL for package purchase logs"
+              className="bg-gaming-dark border-gaming-border text-foreground"
+            />
+          </div>
+          
+          <div className="space-y-2">
             <Label className="text-foreground">Errors Webhook</Label>
             <Input
               value={discordSettings.errors_webhook || ''}
@@ -245,6 +288,13 @@ const DiscordLogsManager = () => {
               size="sm"
             >
               Test Application Log
+            </Button>
+            <Button
+              onClick={() => testDiscordLog('purchase_completed')}
+              variant="outline"
+              size="sm"
+            >
+              Test Package Log
             </Button>
             <Button
               onClick={() => testDiscordLog('error_occurred')}
@@ -597,27 +647,29 @@ const StaffPanel = () => {
             <div className="border-b border-gaming-border p-4 flex items-center bg-gaming-darker/30">
               <SidebarTrigger className="mr-4 hover:bg-gaming-card hover:scale-110 transition-all duration-300 rounded-lg p-2" />
               <div className="animate-slide-up">
-                <h1 className="text-xl font-bold text-foreground">
-                  {activeTab === "overview" && "Dashboard Overview"}
-                  {activeTab === "applications" && "Application Management"}
-                  {activeTab === "rules" && "Rules Management"}
-                  {activeTab === "staff" && "Staff Management"}
-                  {activeTab === "role-management" && "Role & Permissions Management"}
-                  {activeTab === "users" && "User Management"}
-                  {activeTab === "team" && "Team Page Management"}
-                  {activeTab === "partners" && "Partners Management"}
-                  {activeTab === "navbar" && "Navigation Management"}
-                  {activeTab === "live-streamers" && "Live Streamers"}
-                  {activeTab === "settings" && "System Settings"}
-                  {activeTab === "content" && "Homepage Content"}
-                  {activeTab === "server-stats" && "Server Statistics"}
-                  {activeTab === "deployment" && "Deployment Settings"}
-                  {activeTab === "logs" && "System Logs"}
-                  {activeTab === "emails" && "Email Templates"}
-                   {activeTab === "design" && "Design & Appearance"}
-                   {activeTab === "chat" && "Live Chat Management"}
-                   {activeTab === "security" && "Security Management"}
-                </h1>
+                  <h1 className="text-xl font-bold text-foreground">
+                    {activeTab === "overview" && "Dashboard Overview"}
+                    {activeTab === "applications" && "Application Management"}
+                    {activeTab === "rules" && "Rules Management"}
+                    {activeTab === "laws" && "Laws Management"}
+                    {activeTab === "staff" && "Staff Management"}
+                    {activeTab === "role-management" && "Role & Permissions Management"}
+                    {activeTab === "users" && "User Management"}
+                    {activeTab === "team" && "Team Page Management"}
+                    {activeTab === "partners" && "Partners Management"}
+                    {activeTab === "navbar" && "Navigation Management"}
+                    {activeTab === "live-streamers" && "Live Streamers"}
+                    {activeTab === "packages" && "Package Management"}
+                    {activeTab === "settings" && "System Settings"}
+                    {activeTab === "content" && "Homepage Content"}
+                    {activeTab === "server-stats" && "Server Statistics"}
+                    {activeTab === "deployment" && "Deployment Settings"}
+                    {activeTab === "logs" && "System Logs"}
+                    {activeTab === "emails" && "Email Templates"}
+                     {activeTab === "design" && "Design & Appearance"}
+                     {activeTab === "chat" && "Live Chat Management"}
+                     {activeTab === "security" && "Security Management"}
+                  </h1>
                 <div className="flex items-center space-x-2 mt-1">
                   <div className="w-2 h-2 bg-primary rounded-full animate-pulse"></div>
                   <span className="text-sm text-muted-foreground">Live Dashboard</span>
@@ -650,6 +702,12 @@ const StaffPanel = () => {
               {activeTab === "rules" && (
                 <div className="space-y-6">
                   <RulesManager />
+                </div>
+              )}
+
+              {activeTab === "laws" && (
+                <div className="space-y-6">
+                  <LawsManager />
                 </div>
               )}
 
@@ -695,6 +753,13 @@ const StaffPanel = () => {
                 </div>
               )}
 
+              {activeTab === "packages" && (
+                <div className="space-y-6">
+                  <SubscriptionOverview />
+                  <PackageManager />
+                </div>
+              )}
+
               {activeTab === "content" && (
                 <div className="space-y-6">
                   <HomepageContentManager />
@@ -703,7 +768,8 @@ const StaffPanel = () => {
 
               {activeTab === "server-stats" && (
                 <div className="space-y-6">
-                  <ServerStatsManager />
+                  <ServerManager />
+                  <ServerInfoCard />
                 </div>
               )}
 
@@ -758,6 +824,8 @@ const StaffPanel = () => {
               {activeTab === "settings" && (
                 <div className="space-y-6">
                   {/* Email Test */}
+                  <EmailTest />
+                  
                   <Card className="p-4 sm:p-6 bg-gaming-card border-gaming-border shadow-gaming">
                     <div className="flex items-center space-x-2 mb-4 sm:mb-6">
                       <Settings className="h-5 w-5 text-neon-green" />
@@ -816,6 +884,29 @@ const StaffPanel = () => {
                         />
                         <p className="text-xs sm:text-sm text-muted-foreground mt-1">
                           This appears in the homepage hero section
+                        </p>
+                      </div>
+
+                      <div>
+                        <Label className="text-foreground text-sm sm:text-base">Server Tagline</Label>
+                        <Input
+                          value={serverSettings.general_settings?.tagline || ''}
+                          onChange={(e) => {
+                            const newSettings = {
+                              ...serverSettings.general_settings,
+                              tagline: e.target.value
+                            };
+                            setServerSettings({
+                              ...serverSettings,
+                              general_settings: newSettings
+                            });
+                          }}
+                          onBlur={() => handleSettingUpdate('general_settings', serverSettings.general_settings)}
+                          placeholder="#1 PREMIUM FIVEM EXPERIENCE"
+                          className="bg-gaming-dark border-gaming-border text-foreground"
+                        />
+                        <p className="text-xs sm:text-sm text-muted-foreground mt-1">
+                          This appears in the badge above the server name
                         </p>
                       </div>
 

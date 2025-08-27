@@ -202,13 +202,36 @@ const ApplicationManager = () => {
   const fetchApplications = async () => {
     try {
       setIsLoading(true);
+      // Fetch applications with their type (no profile join since there's no FK)
       const { data, error } = await supabase
         .from('applications')
-        .select('*')
+        .select(`
+          *,
+          application_types (
+            name,
+            form_fields
+          )
+        `)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setApplications(data || []);
+      const apps = data || [];
+
+      // Fetch related profiles in a second query and merge manually
+      const userIds = Array.from(new Set(apps.map((a: any) => a.user_id).filter(Boolean)));
+      let profileMap: Record<string, any> = {};
+      if (userIds.length) {
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('id, username, full_name, email')
+          .in('id', userIds);
+        (profiles || []).forEach((p: any) => {
+          profileMap[p.id] = p;
+        });
+      }
+
+      const merged = apps.map((a: any) => ({ ...a, profiles: profileMap[a.user_id] || null }));
+      setApplications(merged);
     } catch (error) {
       console.error('Error fetching applications:', error);
       toast({
@@ -297,16 +320,35 @@ const ApplicationManager = () => {
 
       if (fetchError) throw fetchError;
 
+      const reviewerId = (await supabase.auth.getUser()).data.user?.id;
+
       const { error } = await supabase
         .from('applications')
         .update({
           status,
-          review_notes: notes,
-          reviewed_by: (await supabase.auth.getUser()).data.user?.id
+          notes,
+          reviewed_by: reviewerId,
+          reviewed_at: new Date().toISOString()
         })
         .eq('id', applicationId);
 
       if (error) throw error;
+
+      // Optimistic UI update
+      setApplications((prev: any[]) => prev.map(a => a.id === applicationId ? ({
+        ...a,
+        status,
+        notes,
+        reviewed_by: reviewerId,
+        reviewed_at: new Date().toISOString()
+      }) : a));
+      setSelectedApp((prev: any) => prev && prev.id === applicationId ? ({
+        ...prev,
+        status,
+        notes,
+        reviewed_by: reviewerId,
+        reviewed_at: new Date().toISOString()
+      }) : prev);
 
       // Send email notification
       try {
@@ -320,30 +362,79 @@ const ApplicationManager = () => {
         if (profileError) throw profileError;
 
         // Update the application manager to use new template system
-        if (userProfile?.email) {
-          let templateType: 'application_accepted' | 'application_denied' | 'application_submitted';
+        {
+          let templateType: 'application_approved' | 'application_denied' | 'application_submitted';
           if (status === 'approved') {
-            templateType = 'application_accepted';
+            templateType = 'application_approved';
           } else if (status === 'rejected') {
             templateType = 'application_denied';
           } else {
             templateType = 'application_submitted'; // fallback
           }
 
+          // Get the application type to map form fields properly
+          const { data: applicationType } = await supabase
+            .from('application_types')
+            .select('name, form_fields')
+            .eq('id', appData.application_type_id)
+            .single();
+
+          // Extract applicant data from form_data using the field mapping
+          let applicantName = 'Applicant';
+          let discordName = '';
+          let steamName = '';
+          let fivemName = '';
+
+          if (applicationType?.form_fields && appData.form_data) {
+            const formFields = applicationType.form_fields as any[];
+            const formData = appData.form_data as any;
+
+            // Map field indices to actual values
+            formFields.forEach((field, index) => {
+              const fieldValue = formData[`field_${index}`];
+              if (fieldValue) {
+                const fieldId = field.id || field.name;
+                if (fieldId === 'discord_name' || fieldId === 'discord_username') {
+                  discordName = fieldValue;
+                  if (!applicantName || applicantName === 'Applicant') applicantName = fieldValue;
+                } else if (fieldId === 'steam_name') {
+                  steamName = fieldValue;
+                  if (!applicantName || applicantName === 'Applicant') applicantName = fieldValue;
+                } else if (fieldId === 'fivem_name') {
+                  fivemName = fieldValue;
+                } else if (fieldId === 'full_name') {
+                  applicantName = fieldValue;
+                }
+              }
+            });
+          }
+
+          // Also check the legacy direct fields
+          if (appData.steam_name) {
+            steamName = appData.steam_name;
+            if (!applicantName || applicantName === 'Applicant') applicantName = appData.steam_name;
+          }
+          if (appData.discord_tag) {
+            discordName = appData.discord_tag;
+          }
+          if (appData.fivem_name) {
+            fivemName = appData.fivem_name;
+          }
+
           await supabase.functions.invoke('send-application-email', {
             body: {
               applicationId: applicationId,
               templateType: templateType,
-              recipientEmail: userProfile.email,
-              applicantName: appData.steam_name || appData.discord_name || 'Applicant',
-              applicationType: 'RP Application',
+              recipientEmail: userProfile?.email,
+              applicantName: applicantName,
+              applicationType: applicationType?.name || 'Application',
               reviewNotes: notes || '',
-              discordName: appData.discord_tag || appData.discord_name || ''
+              discordName: discordName,
+              steamName: steamName,
+              fivemName: fivemName
             }
           });
-          console.log('Status update email sent successfully');
-        } else {
-          console.log('No email found for user');
+          console.log('Status update email invoked');
         }
       } catch (emailError) {
         console.error('Error sending status update email:', emailError);
@@ -359,10 +450,10 @@ const ApplicationManager = () => {
           body: {
             type: discordType,
             data: {
-              steam_name: appData.steam_name || '',
-              discord_tag: appData.discord_tag || '',
-              discord_name: appData.discord_name || '',
-              fivem_name: appData.fivem_name || '',
+              steam_name: (appData.form_data as any)?.steam_name || '',
+              discord_tag: (appData.form_data as any)?.discord_tag || '',
+              discord_name: (appData.form_data as any)?.discord_name || '',
+              fivem_name: (appData.form_data as any)?.fivem_name || '',
               review_notes: notes || '',
               form_data: appData.form_data || {} // Include the form_data for fallback
             }
@@ -415,7 +506,8 @@ const ApplicationManager = () => {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'approved': return 'bg-green-500/20 text-green-400 border-green-500/30';
-      case 'rejected': return 'bg-red-500/20 text-red-400 border-red-500/30';
+      case 'rejected':
+      case 'denied': return 'bg-red-500/20 text-red-400 border-red-500/30';
       case 'pending': return 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30';
       default: return 'bg-gray-500/20 text-gray-400 border-gray-500/30';
     }
@@ -489,13 +581,17 @@ const ApplicationsList = ({ applications, updateApplicationStatus, deleteApplica
               <div className="flex items-center justify-between">
                 <div className="space-y-1">
                   <div className="flex items-center space-x-2">
-                    <h3 className="font-medium text-foreground">{app.steam_name || 'Unknown User'}</h3>
+                    <h3 className="font-medium text-foreground">
+                      {app.profiles?.username || app.profiles?.full_name || 
+                       (app.form_data as any)?.steam_name || 
+                       app.steam_name || 'Unknown User'}
+                    </h3>
                     <Badge className={getStatusColor(app.status)}>
                       {app.status}
                     </Badge>
                   </div>
                   <p className="text-sm text-muted-foreground">
-                    Discord: {app.discord_name} • Steam: {app.steam_name}
+                    Type: {app.application_types?.name || 'Application'}
                   </p>
                   <p className="text-xs text-muted-foreground">
                     Applied: {new Date(app.created_at).toLocaleDateString()}
@@ -517,54 +613,68 @@ const ApplicationsList = ({ applications, updateApplicationStatus, deleteApplica
                       <DialogHeader>
                         <DialogTitle className="text-foreground">Application Details</DialogTitle>
                         <DialogDescription className="text-muted-foreground">
-                          Review application from {selectedApp?.steam_name}
+                          Review application from {selectedApp?.profiles?.username || 
+                            selectedApp?.profiles?.full_name || 
+                            (selectedApp?.form_data as any)?.steam_name || 
+                            selectedApp?.steam_name || 'Unknown User'}
                         </DialogDescription>
                       </DialogHeader>
                       
                       {selectedApp && (
                         <div className="space-y-4">
-                          <div className="grid grid-cols-2 gap-4">
-                            <div>
-                              <Label className="text-foreground">Steam Name</Label>
-                              <p className="text-sm text-muted-foreground">{selectedApp.steam_name}</p>
+                          {/* Dynamic form fields based on application type */}
+                          {selectedApp.application_types?.form_fields ? (
+                            <div className="grid grid-cols-1 gap-4">
+                              {(selectedApp.application_types.form_fields as any[]).map((field: any, index: number) => {
+                                const fieldKey = `field_${index}`;
+                                const fieldValue = selectedApp.form_data?.[fieldKey] || 
+                                                 selectedApp.form_data?.[field.id] || 
+                                                 selectedApp[field.label?.toLowerCase().replace(/\s+/g, '_')] || 
+                                                 'N/A';
+                                
+                                return (
+                                  <div key={fieldKey} className="space-y-1">
+                                    <Label className="text-foreground">{field.label}</Label>
+                                    {field.type === 'textarea' ? (
+                                      <div className="text-sm text-muted-foreground p-3 bg-gaming-dark rounded border min-h-[60px]">
+                                        {fieldValue}
+                                      </div>
+                                    ) : (
+                                      <p className="text-sm text-muted-foreground">{fieldValue}</p>
+                                    )}
+                                  </div>
+                                );
+                              })}
                             </div>
-                            <div>
-                              <Label className="text-foreground">Discord Name</Label>
-                              <p className="text-sm text-muted-foreground">{selectedApp.discord_name}</p>
+                          ) : (
+                            /* Fallback for old applications without dynamic form fields */
+                            <div className="grid grid-cols-2 gap-4">
+                              <div>
+                                <Label className="text-foreground">Steam Name</Label>
+                                <p className="text-sm text-muted-foreground">
+                                  {(selectedApp.form_data as any)?.steam_name || selectedApp.steam_name || 'N/A'}
+                                </p>
+                              </div>
+                              <div>
+                                <Label className="text-foreground">Discord Name</Label>
+                                <p className="text-sm text-muted-foreground">
+                                  {(selectedApp.form_data as any)?.discord_name || selectedApp.discord_name || 'N/A'}
+                                </p>
+                              </div>
+                              <div>
+                                <Label className="text-foreground">FiveM Name</Label>
+                                <p className="text-sm text-muted-foreground">
+                                  {(selectedApp.form_data as any)?.fivem_name || selectedApp.fivem_name || 'N/A'}
+                                </p>
+                              </div>
                             </div>
-                            <div>
-                              <Label className="text-foreground">Steam Name</Label>
-                              <p className="text-sm text-muted-foreground">{selectedApp.steam_name}</p>
-                            </div>
-                            <div>
-                              <Label className="text-foreground">FiveM Name</Label>
-                              <p className="text-sm text-muted-foreground">{selectedApp.fivem_name}</p>
-                            </div>
-                            <div>
-                              <Label className="text-foreground">Age</Label>
-                              <p className="text-sm text-muted-foreground">{selectedApp.age}</p>
-                            </div>
-                          </div>
-                          
-                          <div>
-                            <Label className="text-foreground">Character Backstory</Label>
-                            <p className="text-sm text-muted-foreground mt-1 p-3 bg-gaming-dark rounded border">
-                              {selectedApp.character_backstory}
-                            </p>
-                          </div>
-                          
-                          <div>
-                            <Label className="text-foreground">RP Experience</Label>
-                            <p className="text-sm text-muted-foreground mt-1 p-3 bg-gaming-dark rounded border">
-                              {selectedApp.rp_experience}
-                            </p>
-                          </div>
+                          )}
 
-                          {selectedApp.review_notes && (
+                          {selectedApp.notes && (
                             <div>
                               <Label className="text-foreground">Review Notes</Label>
                               <p className="text-sm text-muted-foreground mt-1 p-3 bg-gaming-dark rounded border">
-                                {selectedApp.review_notes}
+                                {selectedApp.notes}
                               </p>
                             </div>
                           )}
@@ -596,7 +706,6 @@ const ApplicationsList = ({ applications, updateApplicationStatus, deleteApplica
                                 </Button>
                                 <Button
                                   onClick={() => {
-                                    console.log('Reject button clicked for application:', selectedApp.id);
                                     updateApplicationStatus(selectedApp.id, 'rejected', reviewNotes);
                                     setReviewNotes("");
                                   }}

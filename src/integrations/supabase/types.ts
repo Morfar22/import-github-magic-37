@@ -517,7 +517,6 @@ export type Database = {
           created_at: string
           created_by: string | null
           description: string | null
-          discount_code: string | null
           id: string
           is_active: boolean
           logo_url: string | null
@@ -530,7 +529,6 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           description?: string | null
-          discount_code?: string | null
           id?: string
           is_active?: boolean
           logo_url?: string | null
@@ -543,7 +541,6 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           description?: string | null
-          discount_code?: string | null
           id?: string
           is_active?: boolean
           logo_url?: string | null
@@ -1080,7 +1077,7 @@ export type Database = {
     }
     Functions: {
       analytics_query: {
-        Args: { query: string } | { query_params?: Json }
+        Args: { query: string }
         Returns: Json
       }
       get_current_user_role: {
@@ -1105,15 +1102,6 @@ export type Database = {
       is_staff: {
         Args: { check_user_uuid: string }
         Returns: boolean
-      }
-      log_analytics_event: {
-        Args: {
-          event_type: string
-          metadata?: Json
-          resource_id?: string
-          resource_type?: string
-        }
-        Returns: string
       }
     }
     Enums: {

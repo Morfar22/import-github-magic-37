@@ -56,6 +56,8 @@ const ServerStatsManager = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [fetching, setFetching] = useState(false);
+  const [testResults, setTestResults] = useState<any>(null);
+  const [testing, setTesting] = useState(false);
 
   useEffect(() => {
     fetchCurrentStats();
@@ -245,6 +247,55 @@ const ServerStatsManager = () => {
     }
   };
 
+  const testServerConnection = async () => {
+    if (!serverInfo.server_ip) {
+      toast({
+        title: "Error",
+        description: "Server IP not configured. Please set it first.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setTesting(true);
+    setTestResults(null);
+    
+    try {
+      const { data, error } = await supabase.functions.invoke('test-fivem-server', {
+        body: { 
+          serverIp: serverInfo.server_ip,
+          port: 30121 
+        }
+      });
+
+      if (error) throw error;
+
+      setTestResults(data);
+      
+      if (data.serverResponding) {
+        toast({
+          title: "Server Test Complete",
+          description: `Server is responding! ${data.successfulEndpoints}/${data.totalEndpoints} endpoints working.`,
+        });
+      } else {
+        toast({
+          title: "Server Test Failed",
+          description: "Server is not responding to HTTP requests.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error('Error testing server:', error);
+      toast({
+        title: "Test Failed",
+        description: "Failed to test server connection.",
+        variant: "destructive",
+      });
+    } finally {
+      setTesting(false);
+    }
+  };
+
   const saveServerInfo = async () => {
     setSaving(true);
     try {
@@ -368,7 +419,50 @@ const ServerStatsManager = () => {
               {fetching ? <RefreshCw className="w-4 h-4 mr-2 animate-spin" /> : <Play className="w-4 h-4 mr-2" />}
               Fetch Live Stats Now
             </Button>
+            <Button 
+              onClick={testServerConnection} 
+              disabled={testing || !serverInfo.server_ip} 
+              variant="outline"
+              className="border-neon-blue hover:border-neon-blue/80"
+            >
+              {testing ? <RefreshCw className="w-4 h-4 mr-2 animate-spin" /> : <Globe className="w-4 h-4 mr-2" />}
+              Test Server Connection
+            </Button>
           </div>
+
+          {/* Test Results */}
+          {testResults && (
+            <div className="mt-6 p-4 bg-gaming-darker/30 rounded-lg border border-gaming-border">
+              <h4 className="text-sm font-semibold text-foreground mb-3">Server Test Results:</h4>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Server Responding:</span>
+                  <Badge variant={testResults.serverResponding ? "default" : "destructive"}>
+                    {testResults.serverResponding ? "Yes" : "No"}
+                  </Badge>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Working Endpoints:</span>
+                  <span className="text-sm text-foreground">
+                    {testResults.successfulEndpoints}/{testResults.totalEndpoints}
+                  </span>
+                </div>
+                {testResults.recommendations && (
+                  <div className="mt-3">
+                    <p className="text-sm text-muted-foreground mb-2">Recommendations:</p>
+                    <ul className="text-xs text-muted-foreground space-y-1">
+                      {testResults.recommendations.map((rec: string, index: number) => (
+                        <li key={index} className="flex items-start">
+                          <span className="w-1 h-1 bg-neon-teal rounded-full mt-2 mr-2 flex-shrink-0" />
+                          {rec}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 

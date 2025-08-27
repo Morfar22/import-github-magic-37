@@ -31,7 +31,7 @@ export function PartnersOverview({ partners: propPartners }: PartnersOverviewPro
     try {
       const { data, error } = await supabase
         .from("partners")
-        .select("id, name, is_active, description, website_url, created_at")
+        .select("id, name, is_active, description, website_url, created_at, discount_code")
         .order("created_at", { ascending: false });
 
       if (error) throw error;

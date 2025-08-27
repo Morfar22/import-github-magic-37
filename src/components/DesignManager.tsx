@@ -90,15 +90,19 @@ const DesignManager = () => {
     try {
       const fileExt = file.name.split('.').pop();
       const fileName = `hero-image-${Date.now()}.${fileExt}`;
-      const filePath = `design/${fileName}`;
+      const filePath = `hero/${fileName}`;
 
+      // Upload to the dedicated design-assets bucket
       const { error: uploadError } = await supabase.storage
-        .from('user-avatars')
+        .from('design-assets')
         .upload(filePath, file);
-      if (uploadError) throw uploadError;
+      if (uploadError) {
+        console.error('Upload error:', uploadError);
+        throw uploadError;
+      }
 
       const { data: { publicUrl } } = supabase.storage
-        .from('user-avatars')
+        .from('design-assets')
         .getPublicUrl(filePath);
 
       setDesignSettings(prev => ({
@@ -108,7 +112,8 @@ const DesignManager = () => {
 
       toast({ title: "Image Uploaded", description: "Hero image uploaded successfully" });
     } catch (error) {
-      toast({ title: "Upload Failed", description: "Failed to upload image", variant: "destructive" });
+      console.error('Hero image upload error:', error);
+      toast({ title: "Upload Failed", description: "Failed to upload image. Check console for details.", variant: "destructive" });
     } finally {
       setUploading(false);
     }
@@ -294,7 +299,7 @@ const DesignManager = () => {
       border_radius: '0.5rem',
       shadow_intensity: 'medium',
       animation_speed: 'normal',
-      server_name: 'DREAMLIGHT RP',
+      server_name: 'Adventure RP',
       welcome_message: 'Experience the ultimate GTA V roleplay in our cyberpunk-themed city. Professional staff, custom content, and endless possibilities await.',
       custom_css: ''
     });
@@ -380,7 +385,7 @@ const DesignManager = () => {
                     <Input
                       value={designSettings.server_name || ''}
                       onChange={(e) => setDesignSettings(prev => ({ ...prev, server_name: e.target.value }))}
-                      placeholder="DREAMLIGHT RP"
+                      placeholder="adventurerp"
                       className="bg-gaming-dark border-gaming-border text-foreground"
                     />
                   </div>

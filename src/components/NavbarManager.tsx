@@ -46,13 +46,27 @@ const NavbarManager = () => {
         .from('server_settings')
         .select('setting_value')
         .eq('setting_key', 'navbar_config')
-        .single();
+        .maybeSingle();
 
       if (error) throw error;
+
+      const defaultItems: NavbarItem[] = [
+        { id: 'home', label: 'Home', path: '/', visible: true, order: 0, staffOnly: false },
+        { id: 'apply', label: 'Apply', path: '/apply', visible: true, order: 1, staffOnly: false },
+        { id: 'rules', label: 'Rules', path: '/rules', visible: true, order: 2, staffOnly: false },
+        { id: 'team', label: 'Our Team', path: '/team', visible: true, order: 3, staffOnly: false },
+        { id: 'partners', label: 'Partners', path: '/partners', visible: true, order: 4, staffOnly: false },
+        { id: 'live', label: 'Live', path: '/live', visible: true, order: 5, staffOnly: false },
+        { id: 'staff', label: 'Staff Panel', path: '/staff', visible: true, order: 6, staffOnly: true },
+        { id: 'servers', label: 'Servers', path: '/servers', visible: true, order: 7, staffOnly: true },
+        { id: 'users', label: 'Users', path: '/users', visible: true, order: 8, staffOnly: true },
+      ];
       
       const config = data?.setting_value as any;
-      if (config?.items) {
+      if (config?.items?.length) {
         setNavbarItems(config.items);
+      } else {
+        setNavbarItems(defaultItems);
       }
     } catch (error) {
       console.error('Error fetching navbar config:', error);
@@ -68,15 +82,32 @@ const NavbarManager = () => {
 
   const saveNavbarConfig = async (items: NavbarItem[]) => {
     try {
-      const { error } = await supabase
+      const { data: existing } = await supabase
         .from('server_settings')
-        .update({
-          setting_value: { items } as any,
-          updated_at: new Date().toISOString()
-        })
-        .eq('setting_key', 'navbar_config');
+        .select('id')
+        .eq('setting_key', 'navbar_config')
+        .maybeSingle();
 
-      if (error) throw error;
+      if (existing) {
+        const { error } = await supabase
+          .from('server_settings')
+          .update({
+            setting_value: { items } as any,
+            updated_at: new Date().toISOString()
+          })
+          .eq('setting_key', 'navbar_config');
+        if (error) throw error;
+      } else {
+        const { data: userData } = await supabase.auth.getUser();
+        const { error } = await supabase
+          .from('server_settings')
+          .insert({
+            setting_key: 'navbar_config',
+            setting_value: { items } as any,
+            created_by: userData.user?.id
+          });
+        if (error) throw error;
+      }
 
       setNavbarItems(items);
       toast({

@@ -29,7 +29,7 @@ interface HomepageContentManagerProps {
 const HomepageContentManager = ({ userId }: HomepageContentManagerProps) => {
   const [homepageFeatures, setHomepageFeatures] = useState<Feature[]>([]);
   const [homepageFeaturesSection, setHomepageFeaturesSection] = useState({
-    title: "Why Choose Dreamlight RP?",
+    title: "Why Choose adventure rp?",
     description: "We've built the most immersive FiveM experience with attention to every detail"
   });
   const [homepageCta, setHomepageCta] = useState<CtaSection>({
@@ -227,7 +227,7 @@ const HomepageContentManager = ({ userId }: HomepageContentManagerProps) => {
               value={homepageFeaturesSection.title}
               onChange={(e) => setHomepageFeaturesSection({...homepageFeaturesSection, title: e.target.value})}
               className="bg-background border-input"
-              placeholder="Why Choose Dreamlight RP?"
+              placeholder="Why Choose adventure rp?"
             />
           </div>
           <div>

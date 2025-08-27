@@ -28,8 +28,27 @@ const Live = () => {
   const [streamers, setStreamers] = useState<TwitchStreamer[]>([]);
   const [streamData, setStreamData] = useState<Record<string, StreamData>>({});
   const [loading, setLoading] = useState(true);
+  const [serverName, setServerName] = useState("Adventure rp");
 
   useEffect(() => {
+    const loadServerName = async () => {
+      try {
+        const { data } = await supabase
+          .from('server_settings')
+          .select('setting_value')
+          .eq('setting_key', 'general_settings')
+          .maybeSingle();
+
+        if (data?.setting_value && typeof data.setting_value === 'object' && 
+            data.setting_value !== null && 'server_name' in data.setting_value) {
+          setServerName((data.setting_value as any).server_name);
+        }
+      } catch (error) {
+        console.error('Error loading server name:', error);
+      }
+    };
+
+    loadServerName();
     fetchStreamers();
     
     // Set up real-time subscription
@@ -55,7 +74,14 @@ const Live = () => {
 
   const fetchStreamers = async () => {
     try {
-      const { data, error } = await supabase.functions.invoke('fetch-twitch-streams');
+      // Set a reasonable timeout for the edge function call
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Request timeout')), 8000)
+      );
+
+      const fetchPromise = supabase.functions.invoke('fetch-twitch-streams');
+      
+      const { data, error } = await Promise.race([fetchPromise, timeoutPromise]) as any;
 
       if (error) {
         console.error('Error calling fetch-twitch-streams:', error);
@@ -68,11 +94,27 @@ const Live = () => {
       }
     } catch (error) {
       console.error('Error fetching streamers:', error);
-      // Fallback to empty data on error
-      setStreamers([]);
-      setStreamData({});
+      // Load streamers from database as fallback
+      await loadStreamersFromDB();
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadStreamersFromDB = async () => {
+    try {
+      const { data } = await supabase
+        .from('twitch_streamers')
+        .select('*')
+        .eq('is_active', true)
+        .order('order_index');
+      
+      if (data) {
+        setStreamers(data);
+        setStreamData({}); // No live data available
+      }
+    } catch (error) {
+      console.error('Error loading streamers from DB:', error);
     }
   };
 
@@ -108,7 +150,7 @@ const Live = () => {
               Live Streams
             </h1>
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              Watch our community members live on Twitch playing on Dreamlight RP
+              Watch our community members live on Twitch playing on {serverName}
             </p>
           </div>
 

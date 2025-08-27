@@ -24,6 +24,7 @@ const Apply = () => {
   const [applicationTypes, setApplicationTypes] = useState<any[]>([]);
   const [selectedApplicationType, setSelectedApplicationType] = useState<any>(null);
   const [serverSettings, setServerSettings] = useState<any>({});
+  const [serverName, setServerName] = useState("Adventure rp");
   const [error, setError] = useState("");
   
   const { toast } = useToast();
@@ -47,8 +48,9 @@ const Apply = () => {
           // Initialize form data based on the application type fields
           const initialFormData: Record<string, any> = {};
           const formFields = data[0].form_fields as any[];
-          formFields?.forEach((field: any) => {
-            initialFormData[field.id] = field.type === 'number' ? 0 : '';
+          formFields?.forEach((field: any, index: number) => {
+            const uniqueFieldId = `field_${index}`;
+            initialFormData[uniqueFieldId] = field.type === 'number' ? 0 : '';
           });
           setFormData(initialFormData);
         }
@@ -57,7 +59,25 @@ const Apply = () => {
       }
     };
 
+    const loadServerName = async () => {
+      try {
+        const { data } = await supabase
+          .from('server_settings')
+          .select('setting_value')
+          .eq('setting_key', 'general_settings')
+          .maybeSingle();
+
+        if (data?.setting_value && typeof data.setting_value === 'object' && 
+            data.setting_value !== null && 'server_name' in data.setting_value) {
+          setServerName((data.setting_value as any).server_name);
+        }
+      } catch (error) {
+        console.error('Error loading server name:', error);
+      }
+    };
+
     fetchApplicationTypes();
+    loadServerName();
     fetchServerSettings();
     checkExistingApplication();
     fetchAllUserApplications();
@@ -162,8 +182,9 @@ const Apply = () => {
       // Reset form data based on new application type
       const newFormData: Record<string, any> = {};
       const formFields = selectedType.form_fields as any[];
-      formFields?.forEach((field: any) => {
-        newFormData[field.id] = field.type === 'number' ? 0 : '';
+      formFields?.forEach((field: any, index: number) => {
+        const uniqueFieldId = `field_${index}`;
+        newFormData[uniqueFieldId] = field.type === 'number' ? 0 : '';
       });
       setFormData(newFormData);
     }
@@ -196,8 +217,9 @@ const Apply = () => {
 
       // Map standard form fields to database columns if they exist
       const submitFormFields = selectedApplicationType.form_fields as any[];
-      submitFormFields?.forEach((field: any) => {
-        const fieldValue = formData[field.id] || '';
+      submitFormFields?.forEach((field: any, index: number) => {
+        const uniqueFieldId = `field_${index}`;
+        const fieldValue = formData[uniqueFieldId] || '';
         
         // Map field labels to database columns for standard fields
         switch (field.label?.toLowerCase()) {
@@ -216,18 +238,8 @@ const Apply = () => {
           case 'fivem username':
             applicationData.fivem_name = fieldValue;
             break;
-          case 'age':
-            applicationData.age = parseInt(fieldValue) || null;
-            break;
-          case 'character backstory':
-          case 'backstory':
-            applicationData.character_backstory = fieldValue;
-            break;
-          case 'rp experience':
-          case 'roleplay experience':
-          case 'experience':
-            applicationData.rp_experience = fieldValue;
-            break;
+          // Remove age mapping since column doesn't exist
+          // All form data is stored in form_data JSON field anyway
         }
       });
 
@@ -248,9 +260,9 @@ const Apply = () => {
             applicationId: data.id || 'temp-id',
             templateType: 'application_submitted',
             recipientEmail: user.email,
-            applicantName: applicationData.steam_name || formData.steam_name || user.email || 'Applicant',
+            applicantName: applicationData.steam_name || user.email || 'Applicant',
             applicationType: 'RP Application',
-            discordName: applicationData.discord_tag || formData.discord_tag || applicationData.discord_name || formData.discord_name || ''
+            discordName: applicationData.discord_tag || applicationData.discord_name || ''
           }
         });
         console.log('Submission email sent successfully');
@@ -265,11 +277,11 @@ const Apply = () => {
           body: {
             type: 'application_submitted',
             data: {
-              steam_name: applicationData.steam_name || formData.steam_name || '',
-              discord_tag: applicationData.discord_tag || formData.discord_tag || '',
-              discord_name: applicationData.discord_name || formData.discord_name || '',
-              fivem_name: applicationData.fivem_name || formData.fivem_name || '',
-              age: applicationData.age || parseInt(formData.age) || 0,
+              user_id: user.id, // Add user_id for profile lookup
+              steam_name: applicationData.steam_name || '',
+              discord_tag: applicationData.discord_tag || '',
+              discord_name: applicationData.discord_name || '',
+              fivem_name: applicationData.fivem_name || '',
               form_data: formData // Include the complete form data for fallback
             }
           }
@@ -290,8 +302,9 @@ const Apply = () => {
       // Reset form
       const resetFormData: Record<string, any> = {};
       const resetFormFields = selectedApplicationType.form_fields as any[];
-      resetFormFields?.forEach((field: any) => {
-        resetFormData[field.id] = field.type === 'number' ? 0 : '';
+      resetFormFields?.forEach((field: any, index: number) => {
+        const uniqueFieldId = `field_${index}`;
+        resetFormData[uniqueFieldId] = field.type === 'number' ? 0 : '';
       });
       setFormData(resetFormData);
       setRulesAgreed(false);
@@ -341,7 +354,7 @@ const Apply = () => {
               Whitelist Application
             </h1>
             <p className="text-muted-foreground">
-              Join Dreamlight RP - The premier FiveM roleplay experience
+              Join {serverName} - The premier FiveM roleplay experience
             </p>
           </div>
 
@@ -387,7 +400,7 @@ const Apply = () => {
                 {(!existingApplication || 
                   existingApplication.status === 'denied' || 
                   serverSettings.application_settings?.multiple_applications_allowed) && (
-                  <Card className="p-8 bg-gaming-card border-gaming-border shadow-gaming">
+                  <Card className="p-8 bg-gaming-card border-gaming-border shadow-gaming max-w-4xl mx-auto">
                     {error && (
                       <Alert className="mb-6 border-destructive/50 bg-destructive/10">
                         <AlertCircle className="h-4 w-4" />
@@ -429,8 +442,9 @@ const Apply = () => {
                       <>
                         <form onSubmit={handleSubmit} className="space-y-6">
                           {(selectedApplicationType?.form_fields as any[])?.map((field: any, index: number) => {
-                            // Create unique field key to avoid conflicts with duplicate names
-                            const fieldKey = `${field.id}_${index}`;
+                            // Use index-based unique key to prevent field ID conflicts
+                            const uniqueFieldId = `field_${index}`;
+                            const fieldKey = `${uniqueFieldId}_${field.label?.replace(/\s+/g, '_').toLowerCase()}`;
                             
                             return (
                               <div key={fieldKey} className="space-y-2">
@@ -442,20 +456,24 @@ const Apply = () => {
                                 {field.type === 'textarea' ? (
                                  <Textarea
                                     id={fieldKey}
-                                    value={formData[field.id] || ''}
-                                    onChange={(e) => setFormData({...formData, [field.id]: e.target.value})}
+                                    value={formData[uniqueFieldId] || ''}
+                                    onChange={(e) => {
+                                      setFormData({...formData, [uniqueFieldId]: e.target.value});
+                                    }}
                                     placeholder={field.placeholder || ''}
-                                    className="bg-gaming-dark border-gaming-border focus:border-neon-purple min-h-[100px]"
+                                    className="w-full max-w-full bg-gaming-dark border-gaming-border focus:border-neon-purple min-h-[100px] resize-none"
                                     required={field.required}
                                   />
                                 ) : (
                                   <Input
                                     id={fieldKey}
                                     type={field.type}
-                                    value={formData[field.id] || ''}
-                                    onChange={(e) => setFormData({...formData, [field.id]: e.target.value})}
+                                    value={formData[uniqueFieldId] || ''}
+                                    onChange={(e) => {
+                                      setFormData({...formData, [uniqueFieldId]: e.target.value});
+                                    }}
                                     placeholder={field.placeholder || ''}
-                                    className="bg-gaming-dark border-gaming-border focus:border-neon-purple"
+                                    className="w-full max-w-full bg-gaming-dark border-gaming-border focus:border-neon-purple"
                                     required={field.required}
                                     min={field.type === 'number' ? '16' : undefined}
                                   />

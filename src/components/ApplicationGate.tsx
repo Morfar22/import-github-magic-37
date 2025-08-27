@@ -19,8 +19,8 @@ const ApplicationGate: React.FC<ApplicationGateProps> = ({ children }) => {
     );
   }
 
-  // Check if applications are disabled
-  if (!settings.application_settings?.accept_applications) {
+  // Check if applications are disabled (treat undefined as open)
+  if (settings.application_settings?.accept_applications === false) {
     return (
       <div className="min-h-screen bg-gradient-hero">
         <Navbar />

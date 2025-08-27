@@ -8,7 +8,7 @@ export default defineConfig(({ mode }) => ({
   server: {
     host: "::",
     port: 8080,
-    allowedHosts: ["www.dreamlightrp.dk", "dreamlightrp.dk"],
+    allowedHosts: ["www.adventurerp.dk", "adventurerp.dk"],
   },
   plugins: [
     react(),

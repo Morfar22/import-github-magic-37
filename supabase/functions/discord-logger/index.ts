@@ -74,6 +74,7 @@ serve(async (req) => {
       staff: discordSettings.staff_webhook || '', 
       security: discordSettings.security_webhook || '',
       general: discordSettings.general_webhook || '',
+      packages: discordSettings.packages_webhook || '',
       errors: discordSettings.errors_webhook || ''
     }
 
@@ -90,16 +91,46 @@ serve(async (req) => {
       case 'application_submitted':
         webhookUrl = webhooks.applications
         console.log('Application submitted - webhook URL found:', webhookUrl)
-        // Extract data from form_data if available, fallback to direct fields
-        const steamName = data.steam_name || data.form_data?.steam_name || "Not provided";
+        
+        // Get user profile data if user_id or email is available
+        let userProfile = null;
+        if (data.user_id) {
+          try {
+            const { data: profile } = await supabaseAdmin
+              .from('profiles')
+              .select('username, email, steam_id')
+              .eq('id', data.user_id)
+              .single();
+            userProfile = profile;
+          } catch (error) {
+            console.log('Failed to fetch user profile:', error);
+          }
+        } else if (data.applicantEmail || data.user_email) {
+          try {
+            const email = data.applicantEmail || data.user_email;
+            const { data: profile } = await supabaseAdmin
+              .from('profiles')
+              .select('username, email, steam_id')
+              .eq('email', email)
+              .single();
+            userProfile = profile;
+          } catch (error) {
+            console.log('Failed to fetch user profile by email:', error);
+          }
+        }
+        
+        // Extract data from form_data if available, fallback to direct fields, then user profile
+        const steamName = data.steam_name || data.form_data?.steam_name || userProfile?.username || userProfile?.email || "Not provided";
         const discordTag = data.discord_tag || data.form_data?.discord_tag || "Not provided";
-        const fivemName = data.fivem_name || data.form_data?.fivem_name || "Not provided";
+        const fivemName = data.fivem_name || data.form_data?.fivem_name || steamName || "Not provided";
         const age = data.age || data.form_data?.age || "Not provided";
+        const applicantEmail = data.applicantEmail || data.user_email || userProfile?.email || "Not provided";
         
         embed = {
           title: "🆕 New Application Submitted",
           color: 0x3498db, // Blue
           fields: [
+            { name: "Applicant Email", value: applicantEmail, inline: true },
             { name: "Steam Name", value: steamName, inline: true },
             { name: "Discord Tag", value: discordTag, inline: true },
             { name: "FiveM Name", value: fivemName, inline: true },
@@ -109,7 +140,7 @@ serve(async (req) => {
           timestamp: new Date().toISOString(),
           footer: { text: "FiveM Server Application System" }
         }
-        content = `📋 **New application received** from **${steamName}**${data.discord_name ? ` (<@${data.discord_name.replace(/[@<>]/g, '')}>)` : ''}`
+        content = `📋 **New application received** from **${steamName}** (${applicantEmail})`
         break
 
       case 'application_approved':
@@ -295,6 +326,28 @@ serve(async (req) => {
         }
         break
 
+      case 'purchase_completed':
+        webhookUrl = webhooks.packages
+        const formattedPrice = new Intl.NumberFormat('en-US', {
+          style: 'currency',
+          currency: data.currency || 'USD',
+        }).format((data.price || 0) / 100);
+        
+        content = `🎉 **New package purchase** from **${data.username || data.customerName || data.customerEmail}**!`
+        embed = {
+          title: '💰 New Purchase Completed!',
+          color: 0x00ff00, // Green
+          fields: [
+            { name: 'Customer Email', value: data.customerEmail || 'Not provided', inline: true },
+            { name: 'Username', value: data.username || data.customerName || 'Not provided', inline: true },
+            { name: 'Package', value: data.packageName || 'Not specified', inline: true },
+            { name: 'Amount', value: formattedPrice, inline: true },
+            { name: 'Purchase Date', value: new Date().toLocaleString(), inline: true }
+          ],
+          timestamp: new Date().toISOString(),
+          footer: { text: 'Package Purchase System' }
+        }
+        break
 
       default:
         console.log('Unknown event type:', type)
@@ -336,16 +389,24 @@ serve(async (req) => {
       body: JSON.stringify(payload),
     })
 
+    const responseText = await response.text()
+    console.log('Discord webhook response status:', response.status)
+    console.log('Discord webhook response:', responseText)
+
     if (!response.ok) {
-      const errorText = await response.text()
-      console.error('Discord webhook error:', response.status, errorText)
-      throw new Error(`Discord webhook failed: ${response.status} - ${errorText}`)
+      console.error('Discord webhook error:', response.status, responseText)
+      throw new Error(`Discord webhook failed: ${response.status} - ${responseText}`)
     }
 
     console.log('Discord message sent successfully')
 
     return new Response(
-      JSON.stringify({ success: true }), 
+      JSON.stringify({ 
+        success: true, 
+        webhookUrl: webhookUrl.substring(0, 50) + '...', // Partial URL for debugging
+        status: response.status,
+        type: type
+      }), 
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
       }

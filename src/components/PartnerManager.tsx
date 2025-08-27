@@ -17,6 +17,7 @@ interface Partner {
   description: string | null;
   logo_url: string | null;
   website_url: string | null;
+  discount_code: string | null;
   is_active: boolean;
   order_index: number;
   created_at: string;
@@ -33,7 +34,8 @@ export default function PartnerManager() {
     logo_url: "",
     website_url: "",
     is_active: true,
-    order_index: 0
+    order_index: 0,
+    discount_code: ""    // <-- NYT felt
   });
   const { toast } = useToast();
 
@@ -103,7 +105,8 @@ export default function PartnerManager() {
       logo_url: partner.logo_url || "",
       website_url: partner.website_url || "",
       is_active: partner.is_active,
-      order_index: partner.order_index
+      order_index: partner.order_index,
+      discount_code: partner.discount_code || ""   // <-- NYT felt
     });
     setIsDialogOpen(true);
   };
@@ -209,7 +212,18 @@ export default function PartnerManager() {
                   onChange={(e) => setFormData({ ...formData, website_url: e.target.value })}
                 />
               </div>
-              
+
+              <div>
+                <Label htmlFor="discount_code">Discount Code</Label>
+                <Input
+                  id="discount_code"
+                  type="text"
+                  value={formData.discount_code}
+                  onChange={(e) => setFormData({ ...formData, discount_code: e.target.value })}
+                  placeholder="Optional: Partner discount code"
+                />
+              </div>
+
               <div>
                 <Label htmlFor="order_index">Order Index</Label>
                 <Input
@@ -273,7 +287,13 @@ export default function PartnerManager() {
                   {partner.description}
                 </p>
               )}
-              
+              {partner.discount_code && (
+                <div className="text-xs mt-2">
+                  <span className="font-semibold text-green-600">Discount code:</span>
+                  <span className="ml-1 bg-gaming-dark rounded px-2 py-1">{partner.discount_code}</span>
+                </div>
+              )}
+
               <div className="flex items-center justify-between">
                 <div className="flex gap-1">
                   <Button

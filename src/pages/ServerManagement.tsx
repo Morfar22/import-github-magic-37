@@ -32,7 +32,7 @@ interface ServerStats {
   uptime_percentage: number;
   ping_ms: number;
   server_online: boolean;
-  last_updated: string;
+  recorded_at: string;
 }
 
 export default function ServerManagement() {
@@ -61,7 +61,7 @@ export default function ServerManagement() {
 
       try {
         const { data, error } = await supabase
-          .rpc('is_staff', { _user_id: user.id });
+          .rpc('is_staff', { check_user_uuid: user.id });
 
         if (error) {
           console.error('Error checking staff role:', error);
@@ -365,7 +365,7 @@ export default function ServerManagement() {
           {servers.map((server) => {
             const stats = serverStats[server.id];
             const isOnline = stats?.server_online || false;
-            const lastUpdated = stats?.last_updated ? new Date(stats.last_updated) : null;
+            const lastUpdated = stats?.recorded_at ? new Date(stats.recorded_at) : null;
             const timeSinceUpdate = lastUpdated ? Date.now() - lastUpdated.getTime() : null;
             const isStale = timeSinceUpdate ? timeSinceUpdate > 5 * 60 * 1000 : true; // 5 minutes
 

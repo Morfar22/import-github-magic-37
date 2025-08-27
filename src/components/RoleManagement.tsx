@@ -148,11 +148,15 @@ export function RoleManagement() {
   const fetchRolePermissions = async (roleId: string) => {
     const { data, error } = await supabase
       .from('role_permissions')
-      .select('permission_name')
+      .select(`
+        permissions!inner(
+          name
+        )
+      `)
       .eq('role_id', roleId);
 
     if (error) throw error;
-    return data?.map(p => p.permission_name) || [];
+    return data?.map(p => (p.permissions as any).name) || [];
   };
 
   const handleSelectRole = async (role: StaffRole) => {
@@ -236,10 +240,18 @@ export function RoleManagement() {
 
       // Add new permissions
       if (rolePermissions.length > 0) {
-        const permissionRecords = rolePermissions.map(permName => ({
+        // First get permission IDs for the selected permission names
+        const { data: permissions, error: permError } = await supabase
+          .from('permissions')
+          .select('id, name')
+          .in('name', rolePermissions);
+        
+        if (permError) throw permError;
+        
+        const permissionRecords = permissions?.map(perm => ({
           role_id: selectedRole.id,
-          permission_name: permName
-        }));
+          permission_id: perm.id
+        })) || [];
 
         const { error } = await supabase
           .from('role_permissions')

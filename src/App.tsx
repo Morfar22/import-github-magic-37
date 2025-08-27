@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import { ServerSettingsProvider } from "@/hooks/useServerSettings";
+import { GlobalPresenceProvider } from "@/contexts/GlobalPresenceContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import StaffProtectedRoute from "@/components/StaffProtectedRoute";
 import MaintenanceMode from "@/components/MaintenanceMode";
@@ -16,21 +17,21 @@ import Auth from "./pages/Auth";
 import Apply from "./pages/Apply";
 import ApplicationForm from "./pages/ApplicationForm";
 import Rules from "./pages/Rules";
+import Laws from "./pages/Laws";
 import StaffPanel from "./pages/StaffPanel";
 import OurTeam from "./pages/OurTeam";
 import Partners from "./pages/Partners";
 import ServerManagement from "./pages/ServerManagement";
 import Profile from "./pages/Profile";
 import Live from "./pages/Live";
+import Packages from "./pages/Packages";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <AuthProvider>
-      <ServerSettingsProvider>
-        <TooltipProvider>
+const AppContent = () => {
+  return (
+    <TooltipProvider>
           <Toaster />
           <Sonner />
           <BrowserRouter>
@@ -42,6 +43,7 @@ const App = () => (
                   <Route path="/" element={<Index />} />
                   <Route path="/auth" element={<Auth />} />
                   <Route path="/rules" element={<Rules />} />
+                  <Route path="/laws" element={<Laws />} />
                   <Route path="/apply" element={
                     <ProtectedRoute>
                       <ApplicationGate>
@@ -66,6 +68,7 @@ const App = () => (
                   } />
                   <Route path="/team" element={<OurTeam />} />
                   <Route path="/partners" element={<Partners />} />
+                  <Route path="/packages" element={<Packages />} />
                   <Route path="/live" element={<Live />} />
                   <Route path="/profile" element={
                     <ProtectedRoute>
@@ -79,7 +82,17 @@ const App = () => (
               <Footer />
             </div>
           </BrowserRouter>
-        </TooltipProvider>
+    </TooltipProvider>
+  );
+};
+
+const App = () => (
+  <QueryClientProvider client={queryClient}>
+    <AuthProvider>
+      <ServerSettingsProvider>
+        <GlobalPresenceProvider>
+          <AppContent />
+        </GlobalPresenceProvider>
       </ServerSettingsProvider>
     </AuthProvider>
   </QueryClientProvider>

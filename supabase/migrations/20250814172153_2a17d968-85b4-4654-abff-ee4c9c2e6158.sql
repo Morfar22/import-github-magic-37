@@ -25,7 +25,7 @@ USING (is_staff(auth.uid()));
 -- Insert default settings
 INSERT INTO public.server_settings (setting_key, setting_value) VALUES
 ('general_settings', '{
-  "server_name": "Dreamlight RP Server",
+  "server_name": "Adventure rp Server",
   "max_players": 64,
   "application_cooldown_days": 0
 }'::jsonb),

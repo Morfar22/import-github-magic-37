@@ -71,7 +71,7 @@ const handler = async (req: Request): Promise<Response> => {
     const servers: FiveMServerConfig[] = [
       {
         id: "main",
-        name: settings.fivem_server_name || "Dreamlight RP - Main",
+        name: settings.fivem_server_name || "Adventure rp - Main",
         ip: settings.fivem_server_ip || "YOUR_SERVER_IP", // Will use database value or fallback
         port: parseInt(settings.fivem_server_port || "30120"),
         coordinates: [-118.2437, 34.0522], // Los Angeles coordinates for Los Santos reference

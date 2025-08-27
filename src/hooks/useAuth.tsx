@@ -71,7 +71,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
                 .from('profiles')
                 .select('banned, username')
                 .eq('id', session.user.id)
-                .single();
+                .maybeSingle();
 
               if (error) {
                 console.error('Error checking ban status:', error);
@@ -118,7 +118,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
           .from('profiles')
           .select('banned')
           .eq('id', user.id)
-          .single();
+          .maybeSingle();
 
         if (error) return;
 

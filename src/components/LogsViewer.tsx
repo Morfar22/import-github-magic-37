@@ -30,6 +30,52 @@ interface LogEntry {
   identifier?: string;
 }
 
+const getHumanReadableMessage = (message: string, type: string, log: any) => {
+  if (type === 'auth') {
+    if (message.includes('Authentication event')) {
+      return `User authentication ${log.status === 200 ? 'successful' : 'failed'} on ${log.path || 'unknown route'}`;
+    }
+    if (message.includes('login')) {
+      return 'User logged into the system';
+    }
+    if (message.includes('logout')) {
+      return 'User logged out of the system';
+    }
+    if (message.includes('signup')) {
+      return 'New user account created';
+    }
+    return message || 'Authentication activity detected';
+  }
+  
+  if (type === 'database') {
+    if (message.includes('Sample database log')) {
+      return 'Database activity recorded';
+    }
+    if (message.includes('connection')) {
+      return 'Database connection event';
+    }
+    if (message.includes('query')) {
+      return 'Database query executed';
+    }
+    return message || 'Database operation completed';
+  }
+  
+  if (type === 'functions') {
+    if (message.includes('Function executed')) {
+      return `${log.function_id || 'Function'} executed successfully in ${log.execution_time_ms || 0}ms`;
+    }
+    if (message.includes('error')) {
+      return `Error in function ${log.function_id || 'unknown'}`;
+    }
+    if (message.includes('timeout')) {
+      return `Function ${log.function_id || 'unknown'} timed out`;
+    }
+    return message || `${log.function_id || 'Function'} activity`;
+  }
+  
+  return message || 'System activity recorded';
+};
+
 const LogsViewer = () => {
   const [authLogs, setAuthLogs] = useState<LogEntry[]>([]);
   const [dbLogs, setDbLogs] = useState<LogEntry[]>([]);
@@ -40,6 +86,8 @@ const LogsViewer = () => {
   const [timeFilter, setTimeFilter] = useState<string>('24h');
   const [expandedLogs, setExpandedLogs] = useState<Set<string>>(new Set());
   const { toast } = useToast();
+
+  console.log('🔧 LogsViewer component mounted/rendered');
 
   const fetchLogs = async () => {
     console.log('🚀 Starting fetchLogs function...');
@@ -93,7 +141,7 @@ const LogsViewer = () => {
           id: log.id || `auth-${Date.now()}-${Math.random()}`,
           timestamp: log.timestamp,
           level: log.level || 'info',
-          event_message: log.event_message || '',
+          event_message: getHumanReadableMessage(log.event_message || '', 'auth', log),
           msg: log.msg,
           path: log.path,
           status: log.status,
@@ -116,7 +164,7 @@ const LogsViewer = () => {
           id: log.id || `db-${Date.now()}-${Math.random()}`,
           timestamp: log.timestamp,
           level: log.error_severity || 'LOG',
-          event_message: log.event_message || '',
+          event_message: getHumanReadableMessage(log.event_message || '', 'database', log),
           msg: log.event_message,
           path: null,
           status: null,
@@ -138,7 +186,7 @@ const LogsViewer = () => {
           id: log.id || `edge-${Date.now()}-${Math.random()}`,
           timestamp: log.timestamp,
           level: log.status_code >= 400 ? 'error' : log.status_code >= 300 ? 'warn' : 'info',
-          event_message: log.event_message || '',
+          event_message: getHumanReadableMessage(log.event_message || '', 'functions', log),
           msg: `${log.method || 'GET'} - ${log.function_id || 'unknown'} (${log.execution_time_ms || 0}ms)`,
           path: log.function_id,
           status: log.status_code?.toString(),
@@ -168,6 +216,13 @@ const LogsViewer = () => {
 
   useEffect(() => {
     fetchLogs();
+    
+    // Set up real-time refresh every 30 seconds
+    const interval = setInterval(() => {
+      fetchLogs();
+    }, 30000);
+    
+    return () => clearInterval(interval);
   }, []);
 
   const getLogLevelIcon = (level: string) => {
@@ -199,7 +254,25 @@ const LogsViewer = () => {
   };
 
   const formatTimestamp = (timestamp: string | number) => {
-    const date = new Date(typeof timestamp === 'number' ? timestamp / 1000 : timestamp);
+    let date: Date;
+    
+    if (typeof timestamp === 'number') {
+      // Handle microsecond timestamps from Supabase (divide by 1000000 to get milliseconds)
+      date = new Date(timestamp > 1e12 ? timestamp / 1000000 : timestamp);
+    } else {
+      // Normalize placeholder timestamps like "+057618-..." to now
+      if (/^\+\d+/.test(timestamp)) {
+        date = new Date();
+      } else {
+        date = new Date(timestamp);
+      }
+    }
+    
+    // Fallback to current time if date is invalid
+    if (isNaN(date.getTime())) {
+      date = new Date();
+    }
+    
     return {
       date: date.toLocaleDateString(),
       time: date.toLocaleTimeString(),
@@ -222,6 +295,14 @@ const LogsViewer = () => {
   };
 
   const filterLogs = (logs: LogEntry[]) => {
+    console.log('🔍 filterLogs called with:', { 
+      totalLogs: logs.length, 
+      searchTerm, 
+      levelFilter, 
+      timeFilter,
+      firstLog: logs[0]
+    });
+
     let filtered = logs;
 
     // Search filter
@@ -242,8 +323,10 @@ const LogsViewer = () => {
 
     // Time filter
     if (timeFilter !== 'all') {
+      console.log('⏰ Applying time filter:', timeFilter);
       const now = new Date();
       const timeThreshold = new Date();
+ 
       
       switch (timeFilter) {
         case '1h':
@@ -261,14 +344,24 @@ const LogsViewer = () => {
       }
       
       filtered = filtered.filter(log => {
-        const logDate = new Date(typeof log.timestamp === 'number' ? log.timestamp / 1000 : log.timestamp);
+        let logDate: Date;
+        const ts: any = log.timestamp as any;
+        if (typeof ts === 'number') {
+          logDate = new Date(ts > 1e12 ? ts / 1000000 : ts);
+        } else {
+          logDate = /^\+\d+/.test(ts) ? new Date() : new Date(ts);
+        }
         return logDate >= timeThreshold;
       });
     }
 
     return filtered.sort((a, b) => {
-      const dateA = new Date(typeof a.timestamp === 'number' ? a.timestamp / 1000 : a.timestamp);
-      const dateB = new Date(typeof b.timestamp === 'number' ? b.timestamp / 1000 : b.timestamp);
+      const parseTs = (t: any) => {
+        if (typeof t === 'number') return new Date(t > 1e12 ? t / 1000000 : t);
+        return /^\+\d+/.test(t) ? new Date() : new Date(t);
+      };
+      const dateA = parseTs(a.timestamp as any);
+      const dateB = parseTs(b.timestamp as any);
       return dateB.getTime() - dateA.getTime();
     });
   };
@@ -329,7 +422,7 @@ const LogsViewer = () => {
               const isExpanded = expandedLogs.has(log.id);
               
               return (
-                <Collapsible key={log.id || index}>
+                <Collapsible key={log.id || index} open={isExpanded}>
                   <div className="p-4 bg-gaming-dark rounded-lg border border-gaming-border hover:border-gaming-accent/50 transition-colors">
                     <CollapsibleTrigger 
                       className="w-full"
@@ -366,114 +459,197 @@ const LogsViewer = () => {
                     
                     <div className="mt-3 text-sm text-foreground">
                       <div className="font-medium truncate">
-                        {log.msg || log.event_message}
+                        {log.event_message}
                       </div>
                     </div>
                     
                     <CollapsibleContent>
-                      <div className="mt-4 pt-4 border-t border-gaming-border space-y-3">
-                        {/* Full timestamp */}
+                      <div className="mt-4 pt-4 border-t border-gaming-border space-y-4">
+                        {/* Time and basic info */}
                         <div className="grid grid-cols-2 gap-4 text-xs">
                           <div>
-                            <span className="text-muted-foreground">Full Time:</span>
+                            <span className="text-muted-foreground">Exact Time:</span>
                             <div className="text-foreground font-mono">{timeData.full}</div>
                           </div>
                           <div>
-                            <span className="text-muted-foreground">Log ID:</span>
-                            <div className="text-foreground font-mono truncate">{log.id}</div>
+                            <span className="text-muted-foreground">Event ID:</span>
+                            <div className="text-foreground font-mono text-xs truncate">{log.id}</div>
                           </div>
                         </div>
                         
-                        {/* Full message */}
-                        <div>
-                          <span className="text-muted-foreground text-xs">Full Message:</span>
-                          <div className="bg-gaming-card p-3 rounded border border-gaming-border mt-1">
-                            <code className="text-xs text-foreground whitespace-pre-wrap break-all">
-                              {log.event_message}
-                            </code>
-                          </div>
-                        </div>
-                        
-                        {/* Additional details based on log type */}
+                        {/* User-friendly details by type */}
                         {type === 'auth' && (
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-                            {log.user_id && (
+                          <div className="space-y-3">
+                            <h4 className="text-sm font-medium text-foreground">Authentication Details</h4>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
                               <div>
                                 <span className="text-muted-foreground flex items-center">
                                   <User className="h-3 w-3 mr-1" />
-                                  User ID:
+                                  User Account:
                                 </span>
-                                <div className="text-foreground font-mono">{log.user_id}</div>
+                                <div className="text-foreground">
+                                  {log.user_id ? log.user_id : 'Anonymous user'}
+                                </div>
                               </div>
-                            )}
-                            {log.ip_address && (
+                              
                               <div>
                                 <span className="text-muted-foreground flex items-center">
                                   <Globe className="h-3 w-3 mr-1" />
-                                  IP Address:
+                                  Location:
                                 </span>
-                                <div className="text-foreground font-mono">{log.ip_address}</div>
+                                <div className="text-foreground">
+                                  {log.ip_address ? log.ip_address : 'Unknown location'}
+                                </div>
                               </div>
-                            )}
+                            </div>
+                            
                             {log.path && (
-                              <div className="col-span-full">
-                                <span className="text-muted-foreground">Request Path:</span>
-                                <div className="text-foreground font-mono">{log.path}</div>
+                              <div>
+                                <span className="text-muted-foreground">Page Accessed:</span>
+                                <div className="text-foreground bg-gaming-card p-2 rounded mt-1 font-mono text-xs">{log.path}</div>
                               </div>
                             )}
-                            {log.user_agent && (
-                              <div className="col-span-full">
-                                <span className="text-muted-foreground">User Agent:</span>
-                                <div className="text-foreground font-mono text-xs truncate">{log.user_agent}</div>
+                            
+                            {log.status && (
+                              <div>
+                                <span className="text-muted-foreground">Result:</span>
+                                <div className={`inline-block px-2 py-1 rounded text-xs font-medium mt-1 ${
+                                  log.status === '200' ? 'bg-green-500/20 text-green-400' : 
+                                  log.status === '401' ? 'bg-red-500/20 text-red-400' :
+                                  'bg-yellow-500/20 text-yellow-400'
+                                }`}>
+                                  {log.status === '200' ? 'Success' : 
+                                   log.status === '401' ? 'Access Denied' :
+                                   log.status === '403' ? 'Forbidden' :
+                                   log.status === '404' ? 'Not Found' :
+                                   `Status: ${log.status}`}
+                                </div>
                               </div>
                             )}
                           </div>
                         )}
                         
                         {type === 'database' && (
-                          <div className="grid grid-cols-2 gap-4 text-xs">
-                            {log.error_severity && (
+                          <div className="space-y-3">
+                            <h4 className="text-sm font-medium text-foreground">Database Activity</h4>
+                            <div className="grid grid-cols-2 gap-4 text-xs">
                               <div>
-                                <span className="text-muted-foreground">Severity:</span>
-                                <div className="text-foreground font-mono">{log.error_severity}</div>
+                                <span className="text-muted-foreground">Operation:</span>
+                                <div className="text-foreground">
+                                  {log.identifier === 'sample' ? 'System Activity' : log.identifier || 'Database Query'}
+                                </div>
                               </div>
-                            )}
-                            {log.identifier && (
+                              
                               <div>
-                                <span className="text-muted-foreground">Database:</span>
-                                <div className="text-foreground font-mono">{log.identifier}</div>
+                                <span className="text-muted-foreground">Priority:</span>
+                                <div className={`inline-block px-2 py-1 rounded text-xs font-medium ${
+                                  log.error_severity === 'ERROR' ? 'bg-red-500/20 text-red-400' :
+                                  log.error_severity === 'WARNING' ? 'bg-yellow-500/20 text-yellow-400' :
+                                  'bg-green-500/20 text-green-400'
+                                }`}>
+                                  {log.error_severity === 'ERROR' ? 'High Priority' :
+                                   log.error_severity === 'WARNING' ? 'Medium Priority' :
+                                   'Normal'}
+                                </div>
                               </div>
-                            )}
+                            </div>
+                            
+                            <div>
+                              <span className="text-muted-foreground">Information:</span>
+                              <div className="bg-gaming-card p-2 rounded mt-1 text-foreground text-xs">
+                                {log.identifier ? `Database: ${log.identifier}` : 'Main database operation completed'}
+                              </div>
+                            </div>
                           </div>
                         )}
                         
                         {type === 'functions' && (
-                          <div className="grid grid-cols-2 gap-4 text-xs">
-                            {log.function_id && (
+                          <div className="space-y-3">
+                            <h4 className="text-sm font-medium text-foreground">Function Execution</h4>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
                               <div>
                                 <span className="text-muted-foreground">Function:</span>
-                                <div className="text-foreground font-mono">{log.function_id}</div>
+                                <div className="text-foreground">
+                                  {log.function_id || 'Unknown Function'}
+                                </div>
                               </div>
-                            )}
-                            {log.method && (
+                              
                               <div>
-                                <span className="text-muted-foreground">Method:</span>
-                                <div className="text-foreground font-mono">{log.method}</div>
+                                <span className="text-muted-foreground">Request Type:</span>
+                                <div className={`inline-block px-2 py-1 rounded text-xs font-medium ${
+                                  log.method === 'GET' ? 'bg-blue-500/20 text-blue-400' :
+                                  log.method === 'POST' ? 'bg-green-500/20 text-green-400' :
+                                  log.method === 'PUT' ? 'bg-yellow-500/20 text-yellow-400' :
+                                  log.method === 'DELETE' ? 'bg-red-500/20 text-red-400' :
+                                  'bg-gray-500/20 text-gray-400'
+                                }`}>
+                                  {log.method || 'GET'}
+                                </div>
                               </div>
-                            )}
-                          </div>
-                        )}
-                        
-                        {log.error && (
-                          <div>
-                            <span className="text-red-400 text-xs">Error Details:</span>
-                            <div className="bg-red-500/10 border border-red-500/30 p-3 rounded mt-1">
-                              <code className="text-xs text-red-400 whitespace-pre-wrap break-all">
-                                {log.error}
-                              </code>
+                            </div>
+                            
+                            <div className="grid grid-cols-2 gap-4 text-xs">
+                              <div>
+                                <span className="text-muted-foreground">Speed:</span>
+                                <div className={`font-medium ${
+                                  (log.execution_time || 0) > 1000 ? 'text-red-400' :
+                                  (log.execution_time || 0) > 500 ? 'text-yellow-400' :
+                                  'text-green-400'
+                                }`}>
+                                  {(log.execution_time || 0) > 1000 ? 'Slow' :
+                                   (log.execution_time || 0) > 500 ? 'Moderate' :
+                                   'Fast'} ({log.execution_time || 0}ms)
+                                </div>
+                              </div>
+                              
+                              <div>
+                                <span className="text-muted-foreground">Result:</span>
+                                <div className={`inline-block px-2 py-1 rounded text-xs font-medium ${
+                                  log.status === '200' ? 'bg-green-500/20 text-green-400' :
+                                  log.status?.startsWith('4') ? 'bg-red-500/20 text-red-400' :
+                                  log.status?.startsWith('5') ? 'bg-red-500/20 text-red-400' :
+                                  'bg-yellow-500/20 text-yellow-400'
+                                }`}>
+                                  {log.status === '200' ? 'Success' :
+                                   log.status?.startsWith('4') ? 'Client Error' :
+                                   log.status?.startsWith('5') ? 'Server Error' :
+                                   `Status: ${log.status || 'N/A'}`}
+                                </div>
+                              </div>
                             </div>
                           </div>
                         )}
+                        
+                        {/* Technical details for developers - collapsible */}
+                        <div className="pt-3 border-t border-gaming-border/50">
+                          <details className="text-xs">
+                            <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
+                              Technical Details (for developers)
+                            </summary>
+                            <div className="mt-2 space-y-2">
+                              <div className="bg-gaming-card p-2 rounded">
+                                <div className="grid grid-cols-1 gap-2">
+                                  {log.user_agent && (
+                                    <div>
+                                      <span className="text-muted-foreground">User Agent:</span>
+                                      <div className="text-foreground font-mono text-xs break-all">{log.user_agent}</div>
+                                    </div>
+                                  )}
+                                  {log.error && (
+                                    <div>
+                                      <span className="text-red-400">Error:</span>
+                                      <div className="text-red-400 font-mono text-xs break-all">{log.error}</div>
+                                    </div>
+                                  )}
+                                  <div>
+                                    <span className="text-muted-foreground">Raw Message:</span>
+                                    <div className="text-foreground font-mono text-xs break-all">{log.msg}</div>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </details>
+                        </div>
                       </div>
                     </CollapsibleContent>
                   </div>
@@ -501,15 +677,22 @@ const LogsViewer = () => {
           <h2 className="text-2xl font-bold text-foreground">System Logs Monitor</h2>
           <p className="text-muted-foreground">Real-time monitoring of authentication, database, and edge function logs</p>
         </div>
-        <Button 
-          onClick={fetchLogs} 
-          disabled={loading}
-          variant="outline"
-          size="sm"
-        >
-          <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-          Refresh All
-        </Button>
+        <div className="flex items-center space-x-3">
+          <div className="flex items-center space-x-2 text-xs text-muted-foreground">
+            <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+            <span>Live Updates Every 30s</span>
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={fetchLogs}
+            disabled={loading}
+            className="text-foreground hover:bg-gaming-accent/20"
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+            Refresh Now
+          </Button>
+        </div>
       </div>
 
       {/* Enhanced Filters */}
@@ -534,7 +717,7 @@ const LogsViewer = () => {
               <SelectTrigger className="bg-gaming-dark border-gaming-border">
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="bg-gaming-dark border-gaming-border">
                 <SelectItem value="all">All Levels</SelectItem>
                 <SelectItem value="error">Error</SelectItem>
                 <SelectItem value="warn">Warning</SelectItem>
@@ -549,7 +732,7 @@ const LogsViewer = () => {
               <SelectTrigger className="bg-gaming-dark border-gaming-border">
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="bg-gaming-dark border-gaming-border">
                 <SelectItem value="all">All Time</SelectItem>
                 <SelectItem value="1h">Last Hour</SelectItem>
                 <SelectItem value="24h">Last 24 Hours</SelectItem>

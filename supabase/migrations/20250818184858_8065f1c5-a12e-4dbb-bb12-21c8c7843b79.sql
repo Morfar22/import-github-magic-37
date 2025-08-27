@@ -28,38 +28,38 @@ EXECUTE FUNCTION public.update_updated_at_column();
 
 -- Insert default email templates
 INSERT INTO public.email_templates (template_type, subject, body) VALUES 
-('application_submitted', 'Application Received - DreamLight RP', 
+('application_submitted', 'Application Received - Adventure rp', 
 'Hi {{applicant_name}},
 
-Thank you for submitting your application to DreamLight RP! 
+Thank you for submitting your application to Adventure rp! 
 
 We have received your {{application_type}} application and our staff team will review it within the next 24-48 hours.
 
 You will receive another email once your application has been reviewed.
 
 Best regards,
-The DreamLight RP Team'),
+The Adventure rp Team'),
 
-('application_accepted', 'Application Accepted - Welcome to DreamLight RP!', 
+('application_accepted', 'Application Accepted - Welcome to Adventure rp!', 
 'Hi {{applicant_name}},
 
 Congratulations! Your {{application_type}} application has been ACCEPTED!
 
 {{review_notes}}
 
-Welcome to the DreamLight RP community! You can now join our Discord server and start your roleplay journey.
+Welcome to the Adventure rp community! You can now join our Discord server and start your roleplay journey.
 
 Best regards,
-The DreamLight RP Team'),
+The Adventure rp Team'),
 
-('application_denied', 'Application Update - DreamLight RP', 
+('application_denied', 'Application Update - Adventure rp', 
 'Hi {{applicant_name}},
 
-Thank you for your interest in DreamLight RP. Unfortunately, your {{application_type}} application has not been approved at this time.
+Thank you for your interest in Adventure rp. Unfortunately, your {{application_type}} application has not been approved at this time.
 
 {{review_notes}}
 
 You are welcome to reapply in the future. Please take the feedback into consideration for your next application.
 
 Best regards,
-The DreamLight RP Team');
+The Adventure rp Team');

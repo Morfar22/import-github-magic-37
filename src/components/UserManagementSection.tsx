@@ -38,14 +38,7 @@ const UserManagementSection = () => {
       setIsLoading(true);
       const { data, error } = await supabase
         .from('profiles')
-        .select(`
-          *,
-          applications!applications_user_id_fkey(
-            id,
-            created_at,
-            status
-          )
-        `)
+        .select('*')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -72,6 +65,21 @@ const UserManagementSection = () => {
         .in('user_id', userIds);
 
       if (staffRolesError) console.error('Error fetching staff roles:', staffRolesError);
+
+      // Fetch recent applications for these users without FK join (no FK required)
+      let appsByUser: Record<string, any[]> = {};
+      if (userIds.length > 0) {
+        const { data: apps, error: appsError } = await supabase
+          .from('applications')
+          .select('id, created_at, status, user_id')
+          .in('user_id', userIds)
+          .order('created_at', { ascending: false });
+        if (appsError) console.warn('Error fetching applications:', appsError);
+        appsByUser = (apps || []).reduce((acc: any, app: any) => {
+          (acc[app.user_id] ||= []).push(app);
+          return acc;
+        }, {});
+      }
 
       // Combine the data
       const usersWithRoles = data?.map(profile => ({
@@ -209,9 +217,9 @@ const handleBanUser = async (user: any, reason: string) => {
 
 const resetUserPassword = async (userId: string, email: string) => {
   try {
-    // Send ONLY userEmail, not userId or email
+    // Send userEmail if present and userId for fallback
     const { error } = await supabase.functions.invoke('reset-user-password', {
-      body: { userEmail: email }
+      body: { userEmail: email || null, userId }
     });
 
     if (error) throw error;

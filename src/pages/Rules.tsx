@@ -74,7 +74,7 @@ const Rules = () => {
     if (!user) return;
     
     try {
-      const { data, error } = await supabase.rpc('is_staff', { _user_id: user.id });
+      const { data, error } = await supabase.rpc('is_staff', { check_user_uuid: user.id });
       if (error) throw error;
       setIsStaff(data || false);
     } catch (error) {

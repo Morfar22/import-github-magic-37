@@ -8,12 +8,24 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Plus, Edit, Trash2, Save, X, FileText, Settings } from "lucide-react";
+import { Plus, Edit, Trash2, Save, X, Settings } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import FormFieldEditor from "./FormFieldEditor";
+
+const discordField = {
+  id: 'discord_name',
+  label: 'Discord Username',
+  type: 'text',
+  required: true,
+  system: true
+};
+
+// Default fields always start with discord_name
+const defaultFields = [
+  discordField,
+];
 
 const ApplicationTypesManager = () => {
   const [applicationTypes, setApplicationTypes] = useState<any[]>([]);
@@ -28,16 +40,6 @@ const ApplicationTypesManager = () => {
   });
   const { user } = useAuth();
   const { toast } = useToast();
-
-  // Default form fields that are commonly used
-  const defaultFields = [
-    { id: 'discord_name', label: 'Discord Username', type: 'text', required: true },
-    { id: 'steam_name', label: 'Steam Name', type: 'text', required: true },
-    { id: 'fivem_name', label: 'FiveM Name', type: 'text', required: true },
-    { id: 'age', label: 'Age', type: 'number', required: true },
-    { id: 'character_backstory', label: 'Character Backstory', type: 'textarea', required: true },
-    { id: 'rp_experience', label: 'RP Experience', type: 'textarea', required: true }
-  ];
 
   useEffect(() => {
     fetchApplicationTypes();
@@ -54,7 +56,6 @@ const ApplicationTypesManager = () => {
       if (error) throw error;
       setApplicationTypes(data || []);
     } catch (error) {
-      console.error('Error fetching application types:', error);
       toast({
         title: "Error",
         description: "Failed to fetch application types",
@@ -65,18 +66,25 @@ const ApplicationTypesManager = () => {
     }
   };
 
+  // Always insert Discord field first if not present
+  function ensureDiscordField(fields: any[]) {
+    const hasDiscord = fields.some(f => f.id === "discord_name");
+    return hasDiscord ? fields : [discordField, ...fields];
+  }
+
   const createApplicationType = async () => {
     try {
+      let fields = newType.form_fields.length > 0 ? newType.form_fields : defaultFields;
+      fields = ensureDiscordField(fields);
       const { error } = await supabase
         .from('application_types')
         .insert({
           ...newType,
-          form_fields: newType.form_fields.length > 0 ? newType.form_fields : defaultFields,
+          form_fields: fields,
           created_by: user?.id
         });
 
       if (error) throw error;
-
       await fetchApplicationTypes();
       setIsCreating(false);
       setNewType({
@@ -90,7 +98,6 @@ const ApplicationTypesManager = () => {
         description: "Application type created successfully",
       });
     } catch (error) {
-      console.error('Error creating application type:', error);
       toast({
         title: "Error",
         description: "Failed to create application type",
@@ -101,13 +108,15 @@ const ApplicationTypesManager = () => {
 
   const updateApplicationType = async (typeId: string, updates: any) => {
     try {
+      // When updating fields, always force Discord username as first
+      if (updates.form_fields) {
+        updates.form_fields = ensureDiscordField(updates.form_fields);
+      }
       const { error } = await supabase
         .from('application_types')
         .update(updates)
         .eq('id', typeId);
-
       if (error) throw error;
-
       await fetchApplicationTypes();
       setEditingType(null);
       toast({
@@ -115,7 +124,6 @@ const ApplicationTypesManager = () => {
         description: "Application type updated successfully",
       });
     } catch (error) {
-      console.error('Error updating application type:', error);
       toast({
         title: "Error",
         description: "Failed to update application type",
@@ -130,16 +138,13 @@ const ApplicationTypesManager = () => {
         .from('application_types')
         .delete()
         .eq('id', typeId);
-
       if (error) throw error;
-
       await fetchApplicationTypes();
       toast({
         title: "Success",
         description: "Application type deleted successfully",
       });
     } catch (error) {
-      console.error('Error deleting application type:', error);
       toast({
         title: "Error",
         description: "Failed to delete application type",
@@ -151,9 +156,7 @@ const ApplicationTypesManager = () => {
   if (isLoading) {
     return (
       <Card className="p-6 bg-gaming-card border-gaming-border">
-        <div className="text-center">
-          <p className="text-foreground">Loading application types...</p>
-        </div>
+        <div className="text-center"><p className="text-foreground">Loading application types...</p></div>
       </Card>
     );
   }
@@ -176,21 +179,19 @@ const ApplicationTypesManager = () => {
             <DialogHeader>
               <DialogTitle className="text-foreground">Create Application Type</DialogTitle>
               <DialogDescription className="text-muted-foreground">
-                Create a new type of application with custom form fields
+                Create a new type of application. Discord Username will always be required.
               </DialogDescription>
             </DialogHeader>
-            
             <div className="space-y-4">
               <div>
                 <Label className="text-foreground">Name</Label>
                 <Input
                   value={newType.name}
                   onChange={(e) => setNewType({ ...newType, name: e.target.value })}
-                  placeholder="e.g., Server Application, Staff Application..."
+                  placeholder="e.g., Staff, Whitelist, Police..."
                   className="bg-gaming-dark border-gaming-border text-foreground"
                 />
               </div>
-              
               <div>
                 <Label className="text-foreground">Description</Label>
                 <Textarea
@@ -200,7 +201,6 @@ const ApplicationTypesManager = () => {
                   className="bg-gaming-dark border-gaming-border text-foreground"
                 />
               </div>
-              
               <div className="flex items-center space-x-2">
                 <Switch
                   checked={newType.is_active}
@@ -208,18 +208,14 @@ const ApplicationTypesManager = () => {
                 />
                 <Label className="text-foreground">Active</Label>
               </div>
-
               <div className="p-4 bg-gaming-dark rounded border">
                 <p className="text-sm text-muted-foreground">
-                  Default form fields will be automatically added: Discord Username, Steam Name, FiveM Name, Age, Character Backstory, and RP Experience.
+                  <b>Note:</b> Discord Username will always be included as a required field in all application types.
                 </p>
               </div>
             </div>
-            
             <div className="flex justify-end space-x-2">
-              <Button variant="outline" onClick={() => setIsCreating(false)}>
-                Cancel
-              </Button>
+              <Button variant="outline" onClick={() => setIsCreating(false)}>Cancel</Button>
               <Button onClick={createApplicationType}>
                 <Save className="h-4 w-4 mr-2" />
                 Create Type
@@ -236,15 +232,16 @@ const ApplicationTypesManager = () => {
           applicationTypes.map((type) => (
             <Card key={type.id} className="p-4 bg-gaming-dark border-gaming-border">
               {editingType?.id === type.id ? (
+                // Rediger navn, beskrivelse, active (felteditor håndterer ikke discord_name’s existence)
                 <div className="space-y-3">
                   <Input
                     value={editingType.name}
-                    onChange={(e) => setEditingType({ ...editingType, name: e.target.value })}
+                    onChange={e => setEditingType({ ...editingType, name: e.target.value })}
                     className="bg-gaming-card border-gaming-border text-foreground"
                   />
                   <Textarea
                     value={editingType.description}
-                    onChange={(e) => setEditingType({ ...editingType, description: e.target.value })}
+                    onChange={e => setEditingType({ ...editingType, description: e.target.value })}
                     className="bg-gaming-card border-gaming-border text-foreground"
                   />
                   <div className="flex items-center justify-between">
@@ -256,17 +253,10 @@ const ApplicationTypesManager = () => {
                       <Label className="text-foreground">Active</Label>
                     </div>
                     <div className="flex space-x-2">
-                      <Button
-                        size="sm"
-                        onClick={() => updateApplicationType(type.id, editingType)}
-                      >
+                      <Button size="sm" onClick={() => updateApplicationType(type.id, editingType)}>
                         <Save className="h-4 w-4" />
                       </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => setEditingType(null)}
-                      >
+                      <Button size="sm" variant="outline" onClick={() => setEditingType(null)}>
                         <X className="h-4 w-4" />
                       </Button>
                     </div>
@@ -278,49 +268,44 @@ const ApplicationTypesManager = () => {
                     <div className="flex items-center space-x-2 mb-1">
                       <h4 className="font-medium text-foreground">{type.name}</h4>
                       {!type.is_active && (
-                        <Badge variant="secondary" className="text-xs">
-                          Inactive
-                        </Badge>
+                        <Badge variant="secondary" className="text-xs">Inactive</Badge>
                       )}
                     </div>
                     <p className="text-sm text-muted-foreground mb-2">{type.description}</p>
-                    <p className="text-xs text-muted-foreground">
-                      Form fields: {type.form_fields?.length || 0} fields configured
-                    </p>
+                    <ul className="text-xs text-muted-foreground mb-1">
+                      {type.form_fields?.map(field =>
+                        <li key={field.id || field.key}>
+                          - {field.label}{field.id === "discord_name" &&
+                            <span className="ml-1 text-neon-blue font-semibold">(required, automatic)</span>}
+                        </li>
+                      )}
+                    </ul>
                   </div>
-                  
                   <div className="flex items-center space-x-2">
                     <Dialog>
                       <DialogTrigger asChild>
                         <Button size="sm" variant="outline">
-                          <Settings className="h-4 w-4 mr-2" />
-                          Fields
+                          <Settings className="h-4 w-4 mr-2" />Fields
                         </Button>
                       </DialogTrigger>
                       <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto bg-gaming-card border-gaming-border">
                         <DialogHeader>
                           <DialogTitle className="text-foreground">Edit Form Fields</DialogTitle>
                           <DialogDescription className="text-muted-foreground">
-                            Customize the form fields for {type.name}
+                            Customize the form fields for {type.name} (Discord Username is always required)
                           </DialogDescription>
                         </DialogHeader>
-                        
                         <FormFieldEditor
                           applicationTypeId={type.id}
-                          initialFields={type.form_fields || []}
-                          onSave={(fields: any) => {
-                            // Refresh the list
-                            fetchApplicationTypes();
+                          initialFields={type.form_fields.filter(f => f.id !== "discord_name")}
+                          onSave={fields => {
+                            // Always inject discord_name!
+                            updateApplicationType(type.id, { form_fields: [discordField, ...fields] });
                           }}
                         />
                       </DialogContent>
                     </Dialog>
-
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => setEditingType(type)}
-                    >
+                    <Button size="sm" variant="outline" onClick={() => setEditingType(type)}>
                       <Edit className="h-4 w-4" />
                     </Button>
                     <AlertDialog>
@@ -341,9 +326,7 @@ const ApplicationTypesManager = () => {
                           <AlertDialogAction
                             onClick={() => deleteApplicationType(type.id)}
                             className="bg-red-600 hover:bg-red-700"
-                          >
-                            Delete
-                          </AlertDialogAction>
+                          >Delete</AlertDialogAction>
                         </AlertDialogFooter>
                       </AlertDialogContent>
                     </AlertDialog>

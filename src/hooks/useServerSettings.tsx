@@ -5,6 +5,7 @@ import { useAuth } from './useAuth';
 interface ServerSettings {
   general_settings: {
     server_name: string;
+    tagline: string;
     welcome_message: string;
     maintenance_mode: boolean;
   };
@@ -44,7 +45,8 @@ interface ServerSettingsContextType {
 
 const defaultSettings: ServerSettings = {
   general_settings: {
-    server_name: 'Dreamlight RP',
+    server_name: 'Adventure rp',
+    tagline: '#1 PREMIUM FIVEM EXPERIENCE',
     welcome_message: 'Welcome to our server!',
     maintenance_mode: false,
   },
@@ -101,8 +103,11 @@ export const ServerSettingsProvider: React.FC<{ children: React.ReactNode }> = (
       const newSettings = { ...defaultSettings };
       
       data?.forEach(setting => {
-        if (setting.setting_value && typeof setting.setting_value === 'object') {
-          newSettings[setting.setting_key as keyof ServerSettings] = setting.setting_value as any;
+        const key = setting.setting_key as keyof ServerSettings;
+        const value = setting.setting_value as any;
+        if (value && typeof value === 'object') {
+          // Merge with defaults so missing flags (like accept_applications) keep default values
+          newSettings[key] = { ...(defaultSettings[key] as any), ...value } as any;
         }
       });
 

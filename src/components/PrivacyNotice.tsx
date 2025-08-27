@@ -158,7 +158,7 @@ const PrivacyNotice = () => {
 
                       <div className="bg-neon-purple/10 border border-neon-purple/20 rounded-lg p-3">
                         <p className="text-sm text-foreground">
-                          <strong>Contact:</strong> For privacy requests or questions, contact our staff team through Discord or email: support@dreamlightrp.dk. 
+                          <strong>Contact:</strong> For privacy requests or questions, contact our staff team through Discord or email: support@adventurerp.dk. 
                           Data is retained for account functionality and may be deleted upon account closure.
                         </p>
                       </div>

@@ -9,12 +9,18 @@ import { CheckCircle, XCircle, Eye, Clock, RotateCcw } from "lucide-react";
 
 interface ClosedApplication {
   id: string;
-  steam_name: string;
-  discord_tag: string;
+  form_data: any;
   status: string;
   created_at: string;
-  closed_at: string;
-  closed_by: string;
+  closed_at?: string;
+  closed_by?: string;
+  user_id: string;
+  application_type_id: string;
+  notes?: string;
+  reviewed_at?: string;
+  reviewed_by?: string;
+  updated_at: string;
+  closed: boolean;
 }
 
 const ClosedApplications = () => {
@@ -146,7 +152,9 @@ const ClosedApplications = () => {
           <div className="flex justify-between items-start mb-4">
             <div>
               <div className="flex items-center gap-2 mb-2">
-                <h3 className="text-lg font-semibold text-foreground">{application.steam_name}</h3>
+                <h3 className="text-lg font-semibold text-foreground">
+                  {(application.form_data as any)?.steam_name || (application.form_data as any)?.steamName || 'Unknown User'}
+                </h3>
                 <Badge 
                   variant="outline" 
                   className={
@@ -190,7 +198,9 @@ const ClosedApplications = () => {
           <div className="grid grid-cols-2 gap-4 text-sm">
             <div>
               <span className="text-muted-foreground">Discord:</span>
-              <p className="text-foreground">{application.discord_tag}</p>
+              <p className="text-foreground">
+                {(application.form_data as any)?.discord_tag || (application.form_data as any)?.discordTag || 'Unknown'}
+              </p>
             </div>
           </div>
         </Card>

@@ -23,7 +23,7 @@ const StaffProtectedRoute = ({ children }: StaffProtectedRouteProps) => {
 
       try {
         const { data, error } = await supabase
-          .rpc('is_staff', { _user_id: user.id });
+          .rpc('is_staff', { check_user_uuid: user.id });
 
         if (error) {
           console.error('Error checking staff role:', error);

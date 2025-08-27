@@ -1,13 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { useAuth } from '@/hooks/useAuth';
-import { supabase } from '@/integrations/supabase/client';
 import { Users, Globe, Clock, RefreshCw, Eye, Smartphone, Monitor } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useGlobalPresenceContext } from '@/contexts/GlobalPresenceContext';
 
 interface ActiveUser {
   user_id: string;
@@ -22,129 +21,10 @@ interface ActiveUser {
 }
 
 const ActiveUsersTracker = () => {
-  const { user } = useAuth();
-  const [activeUsers, setActiveUsers] = useState<ActiveUser[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [userPresence, setUserPresence] = useState<any>(null);
+  const { activeUsers } = useGlobalPresenceContext();
+  const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
 
-  useEffect(() => {
-    if (!user) return;
-
-    // Join the presence channel
-    const channel = supabase.channel('active-users-presence');
-
-    // Track current user's presence
-    const trackPresence = async () => {
-      const userAgent = navigator.userAgent;
-      const isMobile = /Mobile|Android|iPhone|iPad/.test(userAgent);
-      
-      // Get user profile info
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('username, email')
-        .eq('id', user.id)
-        .single();
-
-      // Get user role
-      const { data: roleData } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', user.id)
-        .limit(1);
-
-      const userStatus = {
-        user_id: user.id,
-        username: profile?.username || 'Anonymous',
-        email: profile?.email || user.email,
-        role: roleData?.[0]?.role || 'user',
-        joined_at: new Date().toISOString(),
-        last_seen: new Date().toISOString(),
-        page: window.location.pathname,
-        device_type: isMobile ? 'mobile' : 'desktop',
-        user_agent: userAgent.substring(0, 100) // Limit length
-      };
-
-      setUserPresence(userStatus);
-      
-      // Track presence in Supabase
-      await channel.track(userStatus);
-    };
-
-    // Set up presence listeners
-    channel
-      .on('presence', { event: 'sync' }, () => {
-        const presenceState = channel.presenceState();
-        const users: ActiveUser[] = [];
-        
-        Object.keys(presenceState).forEach(userId => {
-          const presences = presenceState[userId];
-          if (presences && presences.length > 0) {
-            // Filter out invalid presence entries and ensure they have required fields
-            const validPresences = presences.filter((presence: any) => 
-              presence && 
-              typeof presence === 'object' && 
-              presence.user_id &&
-              presence.joined_at &&
-              presence.last_seen
-            );
-            
-            if (validPresences.length > 0) {
-              users.push(validPresences[0] as unknown as ActiveUser);
-            }
-          }
-        });
-        
-        setActiveUsers(users);
-        setIsLoading(false);
-      })
-      .on('presence', { event: 'join' }, ({ newPresences }) => {
-        console.log('User joined:', newPresences);
-      })
-      .on('presence', { event: 'leave' }, ({ leftPresences }) => {
-        console.log('User left:', leftPresences);
-      })
-      .subscribe(async (status) => {
-        if (status === 'SUBSCRIBED') {
-          await trackPresence();
-        }
-      });
-
-    // Update presence every 30 seconds
-    const presenceInterval = setInterval(async () => {
-      if (userPresence) {
-        const updatedPresence = {
-          ...userPresence,
-          last_seen: new Date().toISOString(),
-          page: window.location.pathname
-        };
-        setUserPresence(updatedPresence);
-        await channel.track(updatedPresence);
-      }
-    }, 30000);
-
-    // Update presence when page changes
-    const handlePageChange = async () => {
-      if (userPresence) {
-        const updatedPresence = {
-          ...userPresence,
-          last_seen: new Date().toISOString(),
-          page: window.location.pathname
-        };
-        setUserPresence(updatedPresence);
-        await channel.track(updatedPresence);
-      }
-    };
-
-    // Listen for page changes
-    window.addEventListener('popstate', handlePageChange);
-
-    return () => {
-      clearInterval(presenceInterval);
-      window.removeEventListener('popstate', handlePageChange);
-      supabase.removeChannel(channel);
-    };
-  }, [user]);
 
   const getRelativeTime = (timestamp: string) => {
     const now = new Date();
@@ -174,13 +54,7 @@ const ActiveUsersTracker = () => {
   const refreshPresence = async () => {
     setIsLoading(true);
     try {
-      // Force refresh by rejoining the channel
-      const channel = supabase.channel('active-users-presence');
-      await channel.unsubscribe();
-      
-      setTimeout(() => {
-        window.location.reload(); // Simple refresh for now
-      }, 1000);
+      window.location.reload(); // Simple refresh for now
     } catch (error) {
       console.error('Error refreshing presence:', error);
       toast({

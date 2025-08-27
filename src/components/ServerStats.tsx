@@ -48,32 +48,51 @@ const ServerStats = () => {
   useEffect(() => {
     fetchServerStats();
 
-    const interval = setInterval(fetchServerStats, 30000);
-
+    // Set up real-time subscription with better error handling
     const channel = supabase
-      .channel("server-stats-changes")
+      .channel("server-stats-realtime")
       .on(
         "postgres_changes",
         {
           event: "*",
-          schema: "public",
+          schema: "public", 
           table: "server_stats",
         },
         (payload) => {
-          console.log("Server stats updated:", payload);
+          console.log("Server stats updated via realtime:", payload);
           if (payload.new) {
             setStats(payload.new as ServerStats);
+            setLoading(false);
           }
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          console.log('Real-time subscription active for server stats');
+        } else if (status === 'CHANNEL_ERROR') {
+          console.error('Real-time subscription error, falling back to polling');
+          setupPolling();
+        }
+      });
+
+    // Auto-refresh every 30 seconds regardless of real-time
+    const refreshInterval = setInterval(() => {
+      fetchServerStats();
+    }, 30000);
 
     return () => {
-      clearInterval(interval);
+      clearInterval(refreshInterval);
       supabase.removeChannel(channel);
     };
-    // eslint-disable-next-line
   }, []);
+
+  const setupPolling = () => {
+    const pollingInterval = setInterval(() => {
+      fetchServerStats();
+    }, 10000); // Poll every 10 seconds as fallback
+
+    return () => clearInterval(pollingInterval);
+  };
 
   const fetchServerStats = async () => {
     try {

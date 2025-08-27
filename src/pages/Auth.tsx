@@ -26,6 +26,7 @@ const Auth = () => {
   const [showBannedScreen, setShowBannedScreen] = useState(false);
   const [bannedUserInfo, setBannedUserInfo] = useState<{username: string, email: string} | null>(null);
   const [isPasswordReset, setIsPasswordReset] = useState(false);
+  const [serverName, setServerName] = useState("Adventure rp");
   const captchaRef = useRef<HCaptcha>(null);
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -51,6 +52,27 @@ const Auth = () => {
       checkUser();
     }
   }, [navigate, showBannedScreen]);
+
+  useEffect(() => {
+    const loadServerName = async () => {
+      try {
+        const { data } = await supabase
+          .from('server_settings')
+          .select('setting_value')
+          .eq('setting_key', 'general_settings')
+          .maybeSingle();
+
+        if (data?.setting_value && typeof data.setting_value === 'object' && 
+            data.setting_value !== null && 'server_name' in data.setting_value) {
+          setServerName((data.setting_value as any).server_name);
+        }
+      } catch (error) {
+        console.error('Error loading server name:', error);
+      }
+    };
+
+    loadServerName();
+  }, []);
 
   const cleanupAuthState = () => {
     Object.keys(localStorage).forEach((key) => {
@@ -105,9 +127,9 @@ const Auth = () => {
           .from('profiles')
           .select('banned, username')
           .eq('id', data.user.id)
-          .single();
+          .maybeSingle();
 
-        if (profileError) {
+        if (profileError && profileError.code !== 'PGRST116') {
           console.error('Error checking user profile:', profileError);
           setError("Error checking account status. Please try again.");
           // Sign out the user immediately
@@ -205,6 +227,7 @@ const Auth = () => {
           title: "Account created!",
           description: "Please check your email for a confirmation link.",
         });
+        // Welcome email now handled by Supabase SMTP configuration; no custom function call needed.
       }
       
       // Reset captcha
@@ -292,9 +315,30 @@ const Auth = () => {
       setError(error.message || "An unexpected error occurred");
       setIsLoading(false);
     }
+};
+
+  const handleResendConfirmation = async () => {
+    try {
+      setIsLoading(true);
+      const redirectUrl = `${window.location.origin}/`;
+      const { error } = await supabase.auth.resend({
+        type: 'signup',
+        email,
+        options: { emailRedirectTo: redirectUrl }
+      });
+      if (error) {
+        setError(error.message);
+        return;
+      }
+      toast({ title: 'Confirmation email sent', description: 'Check your inbox (and spam folder).' });
+    } catch (err: any) {
+      setError(err.message || 'Failed to resend confirmation email');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-
+  
   // Show banned screen if user is banned
   if (showBannedScreen && bannedUserInfo) {
     return (
@@ -304,7 +348,7 @@ const Auth = () => {
             <Link to="/" className="inline-flex items-center space-x-2 mb-4">
               <Server className="h-8 w-8 text-neon-purple" />
               <span className="text-2xl font-bold bg-gradient-primary bg-clip-text text-transparent">
-                Dreamlight RP
+                {serverName}
               </span>
             </Link>
           </div>
@@ -316,7 +360,7 @@ const Auth = () => {
               </div>
               <CardTitle className="text-red-500 text-xl">Account Suspended</CardTitle>
               <CardDescription className="text-muted-foreground">
-                Your access to Dreamlight RP has been restricted
+                Your access to {serverName} has been restricted
               </CardDescription>
             </CardHeader>
             
@@ -389,7 +433,7 @@ const Auth = () => {
             <Link to="/" className="inline-flex items-center space-x-2 mb-4">
               <Server className="h-8 w-8 text-neon-purple" />
               <span className="text-2xl font-bold bg-gradient-primary bg-clip-text text-transparent">
-                Dreamlight RP
+                {serverName}
               </span>
             </Link>
             <p className="text-muted-foreground">
@@ -485,7 +529,7 @@ const Auth = () => {
           <Link to="/" className="inline-flex items-center space-x-2 mb-4">
             <Server className="h-8 w-8 text-neon-purple" />
             <span className="text-2xl font-bold bg-gradient-primary bg-clip-text text-transparent">
-              Dreamlight RP
+              {serverName}
             </span>
           </Link>
           <p className="text-muted-foreground">
@@ -513,11 +557,19 @@ const Auth = () => {
                   <AlertDescription>{error}</AlertDescription>
                 </Alert>
               )}
+              {error && error.toLowerCase().includes('confirm') && (
+                <div className="mb-4">
+                  <Button onClick={handleResendConfirmation} variant="secondary" className="w-full">
+                    Resend confirmation email
+                  </Button>
+                  <p className="mt-2 text-center text-xs text-muted-foreground">From noreply@adventurerp.dk — check spam/junk.</p>
+                </div>
+              )}
 
               <TabsContent value="signin" className="space-y-4">
                 <CardTitle className="text-center text-foreground">Welcome Back</CardTitle>
                 <CardDescription className="text-center">
-                  Sign in to your Dreamlight RP account
+                  Sign in to your {serverName} account
                 </CardDescription>
                 
                 <form onSubmit={handleSignIn} className="space-y-4">
@@ -597,7 +649,7 @@ const Auth = () => {
               </TabsContent>
 
               <TabsContent value="signup" className="space-y-4">
-                <CardTitle className="text-center text-foreground">Join Dreamlight RP</CardTitle>
+                <CardTitle className="text-center text-foreground">Join {serverName}</CardTitle>
                 <CardDescription className="text-center">
                   Create your account to apply for whitelist
                 </CardDescription>

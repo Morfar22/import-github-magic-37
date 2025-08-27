@@ -4,6 +4,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import Navbar from "@/components/Navbar";
 import ServerStats from "@/components/ServerStats";
+import ServerDashboard from "@/components/ServerDashboard";
 import ParticleBackground from "@/components/ParticleBackground";
 import { Link } from "react-router-dom";
 import { PlayCircle, Users, Shield, Map, Clock, Star, Zap, Gamepad2, Globe, Award } from "lucide-react";
@@ -13,17 +14,18 @@ import { useServerSettings } from "@/hooks/useServerSettings";
 import { supabase } from "@/integrations/supabase/client";
 import heroImage from "@/assets/hero-image.webp";
 import LiveChatWidget from "@/components/LiveChatWidget";
+import GoogleAd from "@/components/GoogleAds";
 
 const Index = () => {
   const [serverJoinLink, setServerJoinLink] = useState('');
   const [serverInfo, setServerInfo] = useState({
-    displayIp: 'connect dreamlight-rp.com',
+    displayIp: 'connect panel.adventurerp.dk:30120',
     discordUrl: '',
     status: 'online'
   });
   const [homepageFeatures, setHomepageFeatures] = useState<any[]>([]);
   const [homepageFeaturesSection, setHomepageFeaturesSection] = useState<any>({
-    title: "Why Choose Dreamlight RP?",
+    title: "Why Choose Adventure rp?",
     description: "We've built the most immersive FiveM experience with attention to every detail"
   });
   const [homepageCta, setHomepageCta] = useState<any>({
@@ -93,7 +95,7 @@ const Index = () => {
         });
 
         setServerInfo({
-          displayIp: settings.server_display_ip || 'connect dreamlight-rp.com',
+          displayIp: settings.server_display_ip || 'connect panel.adventurerp.dk:30120',
           discordUrl: settings.discord_url || '',
           status: settings.server_status || 'online'
         });
@@ -207,30 +209,6 @@ const Index = () => {
       } else {
         // Fallback to default features only if no data exists
         setHomepageFeatures([
-            {
-              title: "Professional RP Community",
-              description: "Join 300+ serious roleplayers in our whitelist-only server",
-              icon: "Users",
-              color: "text-neon-teal"
-            },
-            {
-              title: "Experienced Staff Team",
-              description: "24/7 moderation ensuring fair and immersive gameplay",
-              icon: "Shield",
-              color: "text-neon-gold"
-            },
-            {
-              title: "Custom Content",
-              description: "Unique jobs, vehicles, and locations for endless possibilities",
-              icon: "Map",
-              color: "text-neon-blue"
-            },
-            {
-              title: "99.9% Uptime",
-              description: "Reliable server infrastructure for uninterrupted gameplay",
-              icon: "Clock",
-              color: "text-golden-light"
-            }
         ]);
       }
 
@@ -277,12 +255,12 @@ const Index = () => {
         <div className="relative container mx-auto px-4 py-20 text-center z-10">
           <Badge className="mb-6 bg-gradient-to-r from-golden-light to-neon-teal text-gaming-darker border-none px-6 py-2 text-sm font-orbitron hover-glow animate-fade-in">
             <Star className="h-4 w-4 mr-2" />
-            #1 PREMIUM FIVEM EXPERIENCE
+            {settings.general_settings?.tagline || '#1 PREMIUM FIVEM EXPERIENCE'}
           </Badge>
           
           <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-8xl font-bold mb-6 px-4 font-orbitron">
             <span className="bg-gradient-to-r from-golden-light via-neon-gold to-neon-teal bg-clip-text text-transparent text-glow animate-fade-in">
-              {settings.general_settings?.server_name || 'DREAMLIGHT RP'}
+              {settings.general_settings?.server_name || 'Adventure rp'}
             </span>
           </h1>
           
@@ -313,8 +291,9 @@ const Index = () => {
             </Button>
           </div>
           
-          <div className="max-w-4xl mx-auto">
-            <ServerStats />
+          {/* Detailed Server Dashboard */}
+          <div className="max-w-6xl mx-auto mt-12">
+            <ServerDashboard />
           </div>
         </div>
       </section>

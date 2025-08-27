@@ -2,8 +2,7 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { Resend } from "npm:resend@2.0.0";
 
-// Setup Resend API email sender
-const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
+// Resend client will be initialized per-request to avoid stale/missing secrets
 
 // CORS headers for browser compatibility
 const corsHeaders = {
@@ -21,8 +20,8 @@ const handler = async (req: Request): Promise<Response> => {
   try {
     console.log("Password reset function called");
 
-    // Parse and validate payload
-    let body: { userEmail?: string };
+    // Parse payload and resolve email if missing
+    let body: { userEmail?: string; userId?: string };
     try {
       body = await req.json();
       console.log("Incoming request body:", body);
@@ -34,36 +33,41 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
-    const { userEmail } = body || {};
-    if (!userEmail || typeof userEmail !== "string" || !userEmail.includes("@")) {
-      console.log("Missing/invalid email in request:", userEmail);
+    const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
+    const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+    const supabaseAdmin = createClient(SUPABASE_URL, SERVICE_ROLE, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+
+    // Determine redirect domain early
+    const originHeader = req.headers.get('origin') || req.headers.get('referer');
+    const redirectDomain = originHeader || 'adventurerp.dk';
+    console.log("Using redirect domain:", redirectDomain);
+
+    let targetEmail = (body.userEmail || '').trim();
+    if (!targetEmail || !targetEmail.includes('@')) {
+      if (body.userId) {
+        try {
+          const { data: userRes, error: adminErr } = await supabaseAdmin.auth.admin.getUserById(body.userId);
+          if (adminErr) console.warn('admin.getUserById error:', adminErr);
+          targetEmail = userRes?.user?.email || '';
+        } catch (e) {
+          console.warn('Lookup by userId failed:', e);
+        }
+      }
+    }
+
+    if (!targetEmail || !targetEmail.includes('@')) {
       return new Response(
         JSON.stringify({ error: "A valid email address is required" }),
         { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
       );
     }
 
-    // Supabase admin for password reset
-    const supabaseAdmin = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
-      {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false,
-        },
-      }
-    );
-
-    // Determine redirect domain
-    const originHeader = req.headers.get('origin') || req.headers.get('referer');
-    const redirectDomain = originHeader || 'dreamlightrp.dk';
-    console.log("Using redirect domain:", redirectDomain);
-
     // Generate password reset link
     const { data, error } = await supabaseAdmin.auth.admin.generateLink({
       type: 'recovery',
-      email: userEmail,
+      email: targetEmail,
       options: {
         redirectTo: `${redirectDomain}/auth`
       }
@@ -73,12 +77,36 @@ const handler = async (req: Request): Promise<Response> => {
       console.log("Supabase error:", error);
       throw error;
     }
-    console.log("Password reset link generated for:", userEmail);
+    console.log("Password reset link generated for:", targetEmail);
+
+    // Initialize Resend per-request and support DB fallback for key
+    let RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
+    if (!RESEND_API_KEY) {
+      try {
+        const { data: keyRow } = await supabaseAdmin
+          .from('server_settings')
+          .select('setting_value')
+          .eq('setting_key', 'resend_api_key')
+          .maybeSingle();
+        const val: any = keyRow?.setting_value;
+        if (typeof val === 'string') RESEND_API_KEY = val;
+        else if (val && typeof val.key === 'string') RESEND_API_KEY = val.key;
+      } catch (e) {
+        console.warn('Failed to load RESEND key from server_settings:', e);
+      }
+    }
+    if (!RESEND_API_KEY) {
+      return new Response(
+        JSON.stringify({ error: 'Missing RESEND_API_KEY', success: false }),
+        { status: 500, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
+      );
+    }
+    const resend = new Resend(RESEND_API_KEY);
 
     // Email user the password reset link via Resend
     const emailResponse = await resend.emails.send({
-      from: "Gaming Community <noreply@dreamlightrp.co>",
-      to: [userEmail],
+      from: "Gaming Community <noreply@adventurerp.dk>",
+      to: [targetEmail],
       subject: "Reset Your Password",
       html: `
         <div style="font-family: Arial, sans-serif; padding: 20px; max-width: 600px; margin: 0 auto;">

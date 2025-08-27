@@ -22,7 +22,7 @@ const MaintenanceMode = () => {
       }
 
       try {
-        const { data } = await supabase.rpc('is_staff', { _user_id: user.id });
+        const { data } = await supabase.rpc('is_staff', { check_user_uuid: user.id });
         setIsStaff(!!data);
       } catch (error) {
         console.error('Error checking staff status:', error);

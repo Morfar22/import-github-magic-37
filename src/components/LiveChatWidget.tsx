@@ -52,6 +52,7 @@ const LiveChatWidget = () => {
 
   useEffect(() => {
     if (session) {
+      loadExistingMessages();
       subscribeToMessages();
       subscribeToSessionUpdates();
     }
@@ -74,6 +75,27 @@ const LiveChatWidget = () => {
     }
   };
 
+  const loadExistingMessages = async () => {
+    if (!session) return;
+
+    console.log('LiveChatWidget: Loading existing messages for session:', session.id);
+
+    try {
+      const { data, error } = await supabase
+        .from('chat_messages')
+        .select('*')
+        .eq('session_id', session.id)
+        .order('created_at', { ascending: true });
+
+      if (error) throw error;
+
+      console.log('LiveChatWidget: Loaded existing messages:', data);
+      setMessages((data || []) as Message[]);
+    } catch (error) {
+      console.error('LiveChatWidget: Error loading existing messages:', error);
+    }
+  };
+
   const subscribeToMessages = () => {
     if (!session) return;
 
@@ -93,6 +115,10 @@ const LiveChatWidget = () => {
           console.log('LiveChatWidget: Received new message via real-time:', payload);
           const newMessage = payload.new as Message;
           setMessages(prev => {
+            // Avoid duplicates
+            const exists = prev.some(msg => msg.id === newMessage.id);
+            if (exists) return prev;
+            
             console.log('LiveChatWidget: Adding message to state. Previous count:', prev.length);
             return [...prev, newMessage];
           });
@@ -207,12 +233,17 @@ const LiveChatWidget = () => {
         }
       }
 
+      // Attach authenticated user if available
+      const { data: authData } = await supabase.auth.getUser();
+      const userId = authData?.user?.id ?? null;
+
       const { data: sessionData, error: sessionError } = await supabase
         .from('chat_sessions')
         .insert({
           visitor_name: visitorName,
           visitor_email: visitorEmail || null,
-          status: 'waiting'
+          status: 'waiting',
+          user_id: userId
         })
         .select()
         .single();
