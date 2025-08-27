@@ -10,6 +10,7 @@ interface Partner {
   is_active: boolean;
   description?: string;
   website_url?: string;
+  discount_code?: string;
   created_at: string;
 }
 
@@ -31,7 +32,7 @@ export function PartnersOverview({ partners: propPartners }: PartnersOverviewPro
     try {
       const { data, error } = await supabase
         .from("partners")
-        .select("id, name, is_active, description, website_url, created_at, discount_code")
+        .select("id, name, is_active, description, website_url, created_at")
         .order("created_at", { ascending: false });
 
       if (error) throw error;

@@ -29,7 +29,7 @@ const ApplicationForm = () => {
   const discordName =
     user?.user_metadata?.discord_name ||
     user?.user_metadata?.user_name ||
-    user?.username ||
+    user?.user_metadata?.username ||
     "";
 
   useEffect(() => {
