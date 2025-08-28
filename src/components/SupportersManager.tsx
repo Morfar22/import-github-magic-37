@@ -161,7 +161,7 @@ export default function SupportersManager() {
       const tierFromAmount = calculateTierFromAmount(formData.amount);
       
       const supporterData = {
-        user_id: formData.user_id,
+        user_id: formData.user_id === "external_donor" ? null : formData.user_id,
         amount: formData.amount,
         supporter_tier: tierFromAmount,
         donation_date: new Date(formData.donation_date).toISOString(),
@@ -212,7 +212,7 @@ export default function SupportersManager() {
   const handleEdit = (supporter: Supporter) => {
     setEditingSupporter(supporter);
     setFormData({
-      user_id: supporter.user_id,
+      user_id: supporter.user_id || "external_donor",
       amount: supporter.amount,
       supporter_tier: supporter.supporter_tier,
       donation_date: supporter.donation_date.split('T')[0],
@@ -307,14 +307,14 @@ export default function SupportersManager() {
                   <div className="space-y-2">
                     <Label className="text-foreground">User (Optional)</Label>
                     <Select 
-                      value={formData.user_id || ""} 
-                      onValueChange={(value) => setFormData({...formData, user_id: value || null})}
+                      value={formData.user_id || "external_donor"} 
+                      onValueChange={(value) => setFormData({...formData, user_id: value === "external_donor" ? null : value})}
                     >
                       <SelectTrigger className="bg-gaming-dark border-gaming-border text-foreground">
                         <SelectValue placeholder="Select a user (leave empty for external donor)" />
                       </SelectTrigger>
                       <SelectContent className="bg-gaming-dark border-gaming-border">
-                        <SelectItem value="">External Donor</SelectItem>
+                        <SelectItem value="external_donor">External Donor</SelectItem>
                         {users.map((user) => (
                           <SelectItem key={user.id} value={user.id}>
                             {user.username || user.email}
@@ -324,7 +324,7 @@ export default function SupportersManager() {
                     </Select>
                   </div>
 
-                  {!formData.user_id && (
+                  {(!formData.user_id || formData.user_id === "external_donor") && (
                     <>
                       <div className="space-y-2">
                         <Label className="text-foreground">Donor Name</Label>
