@@ -30,7 +30,8 @@ import {
   Palette,
   MessageSquare,
   CreditCard,
-  Scale
+  Scale,
+  Heart
 } from "lucide-react";
 
 interface StaffSidebarProps {
@@ -56,6 +57,7 @@ const navigationItems = [
       { id: "design", label: "Design & Appearance", icon: Palette },
       { id: "live-streamers", label: "Live Streamers", icon: Tv },
       { id: "packages", label: "Packages", icon: CreditCard },
+      { id: "supporters", label: "Supporters", icon: Heart },
     ]
   },
   {

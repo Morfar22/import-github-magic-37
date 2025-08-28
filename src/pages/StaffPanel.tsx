@@ -69,6 +69,7 @@ import ServerInfoCard from "@/components/ServerInfoCard";
 import { PackageManager } from "@/components/PackageManager";
 import { SubscriptionOverview } from "@/components/SubscriptionOverview";
 import LawsManager from "@/components/LawsManager";
+import SupportersManager from "@/components/SupportersManager";
 
 const DiscordLogsManager = () => {
   const [discordSettings, setDiscordSettings] = useState<any>({});
@@ -669,6 +670,7 @@ const StaffPanel = () => {
                      {activeTab === "design" && "Design & Appearance"}
                      {activeTab === "chat" && "Live Chat Management"}
                      {activeTab === "security" && "Security Management"}
+                     {activeTab === "supporters" && "Supporters Management"}
                   </h1>
                 <div className="flex items-center space-x-2 mt-1">
                   <div className="w-2 h-2 bg-primary rounded-full animate-pulse"></div>
@@ -818,6 +820,12 @@ const StaffPanel = () => {
                     setServerSettings={setServerSettings}
                     handleSettingUpdate={handleSettingUpdate}
                   />
+                </div>
+              )}
+
+              {activeTab === "supporters" && (
+                <div className="space-y-6">
+                  <SupportersManager />
                 </div>
               )}
 
