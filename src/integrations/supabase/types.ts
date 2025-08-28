@@ -517,6 +517,7 @@ export type Database = {
           created_at: string
           created_by: string | null
           description: string | null
+          discount_code: string | null
           id: string
           is_active: boolean
           logo_url: string | null
@@ -529,6 +530,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           description?: string | null
+          discount_code?: string | null
           id?: string
           is_active?: boolean
           logo_url?: string | null
@@ -541,6 +543,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           description?: string | null
+          discount_code?: string | null
           id?: string
           is_active?: boolean
           logo_url?: string | null
@@ -901,6 +904,48 @@ export type Database = {
           },
         ]
       }
+      supporters: {
+        Row: {
+          amount: number
+          created_at: string | null
+          currency: string | null
+          donation_date: string | null
+          id: string
+          is_anonymous: boolean | null
+          is_featured: boolean | null
+          message: string | null
+          supporter_tier: string | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          amount: number
+          created_at?: string | null
+          currency?: string | null
+          donation_date?: string | null
+          id?: string
+          is_anonymous?: boolean | null
+          is_featured?: boolean | null
+          message?: string | null
+          supporter_tier?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          amount?: number
+          created_at?: string | null
+          currency?: string | null
+          donation_date?: string | null
+          id?: string
+          is_anonymous?: boolean | null
+          is_featured?: boolean | null
+          message?: string | null
+          supporter_tier?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       team_members: {
         Row: {
           bio: string | null
@@ -1077,12 +1122,25 @@ export type Database = {
     }
     Functions: {
       analytics_query: {
-        Args: { query: string }
+        Args: { query: string } | { query_params?: Json }
         Returns: Json
+      }
+      calculate_supporter_tier: {
+        Args: { total_amount: number }
+        Returns: string
       }
       get_current_user_role: {
         Args: Record<PropertyKey, never>
         Returns: string
+      }
+      get_user_supporter_status: {
+        Args: { check_user_id: string }
+        Returns: {
+          is_supporter: boolean
+          latest_donation: string
+          tier: string
+          total_donated: number
+        }[]
       }
       has_role: {
         Args: {
@@ -1102,6 +1160,15 @@ export type Database = {
       is_staff: {
         Args: { check_user_uuid: string }
         Returns: boolean
+      }
+      log_analytics_event: {
+        Args: {
+          event_type: string
+          metadata?: Json
+          resource_id?: string
+          resource_type?: string
+        }
+        Returns: string
       }
     }
     Enums: {

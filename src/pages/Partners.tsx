@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ExternalLink, Copy } from "lucide-react";
+import { ExternalLink, Copy, CheckCircle, Star, Zap, Trophy, Shield } from "lucide-react";
 import Navbar from "@/components/Navbar";
 
 interface Partner {
@@ -55,125 +55,203 @@ export default function Partners() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gaming-dark via-[#181b25] to-gaming-dark">
-      <Navbar />
-      <main className="container mx-auto px-4 py-12">
-        <section className="text-center mb-14">
-          <h1 className="text-4xl md:text-6xl font-extrabold mb-3 tracking-tight bg-gradient-to-r from-neon-blue via-neon-purple to-neon-orange bg-clip-text text-transparent drop-shadow-lg animate-fade-in">
-            Adventure RP <span className="block text-2xl md:text-3xl font-semibold text-foreground mt-1">Premium FiveM Partners</span>
-          </h1>
-          <p className="text-lg text-gray-300 max-w-2xl mx-auto mt-4 mb-2">
-            Oplev vores eksklusive samarbejdspartnere, der bidrager til et endnu stærkere og sjovere RP-fællesskab.
-          </p>
-        </section>
+    <div className="min-h-screen relative overflow-hidden">
+      {/* Animated background with cyberpunk grid */}
+      <div className="absolute inset-0 bg-gradient-to-br from-gaming-dark via-gaming-darker to-gaming-dark"></div>
+      <div className="absolute inset-0 cyber-grid opacity-30"></div>
+      <div className="absolute inset-0 bg-gradient-to-t from-gaming-dark/50 via-transparent to-gaming-dark/50"></div>
+      
+      {/* Floating particles */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        {[...Array(8)].map((_, i) => (
+          <div
+            key={i}
+            className="particle"
+            style={{
+              left: `${Math.random() * 100}%`,
+              animationDelay: `${Math.random() * 20}s`,
+              animationDuration: `${18 + Math.random() * 10}s`,
+            }}
+          />
+        ))}
+      </div>
 
-        {loading ? (
-          <div className="flex items-center justify-center h-64">
-            <div className="text-center">
-              <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-              <p className="text-muted-foreground">Loading partners...</p>
+      <div className="relative z-10">
+        <Navbar />
+        
+        <main className="container mx-auto px-4 py-16">
+          {/* Hero Section */}
+          <section className="text-center mb-20 relative">
+            <div className="absolute inset-0 bg-gradient-to-r from-primary/10 via-secondary/10 to-primary/10 blur-3xl -z-10"></div>
+            
+            <div className="inline-flex items-center gap-2 mb-6 px-4 py-2 bg-gaming-card border border-gaming-border rounded-full">
+              <Trophy className="w-5 h-5 text-primary" />
+              <span className="text-sm font-medium text-foreground">Elite Partnership Network</span>
             </div>
-          </div>
-        ) : partners.length > 0 ? (
-          <div className="grid gap-7 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {partners.map((partner) => (
-              <Card key={partner.id} className="bg-gradient-to-br from-[#26294b] via-[#20223a] to-[#31325e] border-none shadow-lg group hover:scale-105 transition-all duration-300">
-                <CardHeader className="pb-4">
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex-1">
-                      <CardTitle className="text-2xl mb-2 font-extrabold group-hover:text-neon-purple transition-colors text-white">
-                        {partner.name}
-                      </CardTitle>
-                      <div className="flex flex-wrap gap-2 items-center mt-1">
-                        <span
-                          className="uppercase tracking-widest font-bold text-lg px-4 py-1 rounded bg-blue-600/90 text-white shadow border-2 border-blue-400"
-                          style={{
-                            letterSpacing: "0.04em",
-                            boxShadow: "0 2px 8px #152a4588"
-                          }}
-                        >
-                          Partner
-                        </span>
-                      {partner.discount_code && (
-                        <span className="flex items-center gap-0.5 ml-1">
-                          <span
-                            className="font-bold text-base px-4 py-1 rounded bg-green-600/90 text-white shadow border-2 border-green-400 flex items-center tracking-wider"
-                            style={{
-                              letterSpacing: "0.06em",
-                              boxShadow: "0 2px 10px #1ecb7a30",
-                              userSelect: "all"
-                            }}
-                          >
-                            Rabatkode:&nbsp;
-                            <span className="font-mono text-lg mr-2 select-all">{partner.discount_code}</span>
-                            <button
-                              onClick={() => handleCopy(partner.discount_code!, partner.id)}
-                              className="hover:scale-110 transition-all ml-1 text-white"
-                              title="Kopier rabatkode"
-                              type="button"
-                              aria-label="Kopier rabatkode"
-                            >
-                              <Copy className="inline w-4 h-4" />
-                            </button>
-                          </span>
-                          {copied === partner.id && (
-                            <span className="ml-2 text-green-400 font-medium text-xs">Kopieret!</span>
-                          )}
-                        </span>
-                      )}
-                      </div>
-                    </div>
-                    {partner.logo_url && (
-                      <div className="ml-4 flex-shrink-0">
-                        <img 
-                          src={partner.logo_url} 
-                          alt={`${partner.name} logo`}
-                          className="w-16 h-16 object-contain rounded-xl bg-background/10 p-2 shadow-md"
-                        />
+            
+            <h1 className="text-5xl md:text-7xl font-extrabold mb-6 tracking-tight">
+              <span className="bg-gradient-primary bg-clip-text text-transparent drop-shadow-lg text-glow">
+                Adventure RP
+              </span>
+              <span className="block text-3xl md:text-4xl font-bold text-foreground mt-2 animate-slide-up">
+                <Zap className="inline w-8 h-8 mr-2 text-primary" />
+                Premium Partners
+              </span>
+            </h1>
+            
+            <p className="text-xl text-muted-foreground max-w-3xl mx-auto leading-relaxed mb-8">
+              Discover our exclusive partnership network. Elite collaborations that elevate the entire RP experience with premium benefits and exclusive offers.
+            </p>
+            
+            <div className="flex flex-wrap items-center justify-center gap-6 mb-8">
+              <div className="flex items-center gap-2 px-4 py-2 bg-gaming-card/50 backdrop-blur-sm border border-gaming-border rounded-lg">
+                <Shield className="w-5 h-5 text-primary" />
+                <span className="text-sm font-medium">Verified Partners</span>
+              </div>
+              <div className="flex items-center gap-2 px-4 py-2 bg-gaming-card/50 backdrop-blur-sm border border-gaming-border rounded-lg">
+                <Star className="w-5 h-5 text-secondary" />
+                <span className="text-sm font-medium">Exclusive Benefits</span>
+              </div>
+            </div>
+          </section>
+
+          {loading ? (
+            <div className="flex items-center justify-center h-96">
+              <div className="text-center">
+                <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-6 shadow-glow-primary"></div>
+                <p className="text-lg text-muted-foreground">Loading elite partners...</p>
+              </div>
+            </div>
+          ) : partners.length > 0 ? (
+            <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
+              {partners.map((partner, index) => (
+                <div
+                  key={partner.id}
+                  className="group animate-fade-in hover-lift"
+                  style={{ animationDelay: `${index * 100}ms` }}
+                >
+                  <Card className="card-gaming-outline bg-gradient-card border-2 border-gaming-border hover:border-primary/50 overflow-hidden relative">
+                    {/* Glowing border effect */}
+                    <div className="absolute inset-0 bg-gradient-primary opacity-0 group-hover:opacity-20 transition-opacity duration-500 blur-xl"></div>
+                    
+                    {/* Premium badge for partners with discount codes */}
+                    {partner.discount_code && (
+                      <div className="absolute top-4 right-4 z-10">
+                        <div className="badge-cyber">
+                          <Star className="w-3 h-3 mr-1" />
+                          Premium
+                        </div>
                       </div>
                     )}
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  {partner.description && (
-                    <p className="text-muted-foreground mb-3 leading-relaxed text-[15px] group-hover:text-foreground">
-                      {partner.description}
-                    </p>
-                  )}
-                  {partner.website_url && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="w-full group-hover:bg-neon-blue group-hover:text-white transition-all font-bold mt-3"
-                      asChild
-                    >
-                      <a 
-                        href={partner.website_url} 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="flex items-center justify-center gap-2"
-                      >
-                        <ExternalLink className="w-4 h-4" />
-                        Besøg hjemmeside
-                      </a>
-                    </Button>
-                  )}
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        ) : (
-          <div className="text-center py-16">
-            <div className="w-20 h-20 bg-gaming-card border-gaming-border rounded-full flex items-center justify-center mx-auto mb-4">
-              <ExternalLink className="w-10 h-10 text-muted-foreground" />
+                    
+                    <CardHeader className="pb-4 relative z-10">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1">
+                          <CardTitle className="text-2xl font-bold mb-3 group-hover:text-primary transition-colors duration-300">
+                            {partner.name}
+                          </CardTitle>
+                          
+                          <div className="flex flex-wrap gap-2 items-center">
+                            <Badge className="bg-gradient-primary text-primary-foreground font-semibold border-0 shadow-neon">
+                              <Shield className="w-3 h-3 mr-1" />
+                              Verified Partner
+                            </Badge>
+                          </div>
+                        </div>
+                        
+                        {partner.logo_url && (
+                          <div className="flex-shrink-0">
+                            <div className="w-16 h-16 bg-gaming-card border border-gaming-border rounded-xl p-2 group-hover:border-primary/50 transition-colors duration-300 shadow-gaming">
+                              <img 
+                                src={partner.logo_url} 
+                                alt={`${partner.name} logo`}
+                                className="w-full h-full object-contain"
+                              />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </CardHeader>
+                    
+                    <CardContent className="pt-0 relative z-10">
+                      {partner.description && (
+                        <p className="text-muted-foreground mb-6 leading-relaxed group-hover:text-foreground transition-colors duration-300">
+                          {partner.description}
+                        </p>
+                      )}
+                      
+                      {/* Discount code section */}
+                      {partner.discount_code && (
+                        <div className="mb-6 p-4 bg-gradient-to-r from-gaming-card to-gaming-dark border border-gaming-border rounded-lg relative overflow-hidden">
+                          <div className="absolute inset-0 bg-gradient-primary opacity-5"></div>
+                          <div className="relative z-10">
+                            <div className="flex items-center gap-2 mb-2">
+                              <Star className="w-4 h-4 text-secondary" />
+                              <span className="text-sm font-medium text-secondary">Exclusive Discount</span>
+                            </div>
+                            <div className="flex items-center justify-between gap-3">
+                              <div className="flex-1">
+                                <code className="text-lg font-mono font-bold text-primary bg-gaming-dark px-3 py-2 rounded border border-gaming-border">
+                                  {partner.discount_code}
+                                </code>
+                              </div>
+                              <Button
+                                size="sm"
+                                onClick={() => handleCopy(partner.discount_code!, partner.id)}
+                                className="bg-gradient-primary hover:opacity-90 border-0 shadow-glow-primary"
+                              >
+                                {copied === partner.id ? (
+                                  <>
+                                    <CheckCircle className="w-4 h-4 mr-1" />
+                                    Copied!
+                                  </>
+                                ) : (
+                                  <>
+                                    <Copy className="w-4 h-4 mr-1" />
+                                    Copy
+                                  </>
+                                )}
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      
+                      {/* Website button */}
+                      {partner.website_url && (
+                        <Button
+                          className="w-full bg-gaming-card hover:bg-gradient-primary border border-gaming-border hover:border-primary/50 hover:shadow-glow-primary transition-all duration-300"
+                          asChild
+                        >
+                          <a 
+                            href={partner.website_url} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="flex items-center justify-center gap-2"
+                          >
+                            <ExternalLink className="w-4 h-4" />
+                            Visit Website
+                          </a>
+                        </Button>
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
+              ))}
             </div>
-            <h3 className="text-2xl font-semibold mb-2 text-foreground">Ingen partnere endnu</h3>
-            <p className="text-muted-foreground">
-              Vi arbejder på flere stærke samarbejder – følg med!
-            </p>
-          </div>
-        )}
-      </main>
+          ) : (
+            <div className="text-center py-24">
+              <div className="inline-flex items-center justify-center w-24 h-24 bg-gaming-card border-2 border-gaming-border rounded-full mx-auto mb-6 shadow-gaming">
+                <ExternalLink className="w-12 h-12 text-muted-foreground" />
+              </div>
+              <h3 className="text-3xl font-bold mb-4 text-foreground">Building Elite Partnerships</h3>
+              <p className="text-lg text-muted-foreground max-w-md mx-auto leading-relaxed">
+                We're curating exclusive partnerships to enhance your Adventure RP experience. Stay tuned for amazing collaborations!
+              </p>
+            </div>
+          )}
+        </main>
+      </div>
     </div>
   );
 }

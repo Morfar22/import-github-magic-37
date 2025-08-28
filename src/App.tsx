@@ -26,6 +26,7 @@ import Profile from "./pages/Profile";
 import Live from "./pages/Live";
 import Packages from "./pages/Packages";
 import NotFound from "./pages/NotFound";
+import Supporters from "./pages/Supporters";
 
 const queryClient = new QueryClient();
 
@@ -68,6 +69,7 @@ const AppContent = () => {
                   } />
                   <Route path="/team" element={<OurTeam />} />
                   <Route path="/partners" element={<Partners />} />
+                  <Route path="/supporters" element={<Supporters />} />
                   <Route path="/packages" element={<Packages />} />
                   <Route path="/live" element={<Live />} />
                   <Route path="/profile" element={
