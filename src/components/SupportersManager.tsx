@@ -83,26 +83,27 @@ export default function SupportersManager() {
     try {
       const { data, error } = await supabase
         .from("supporters")
-        .select(`
-          *,
-          profiles!left (
-            username,
-            email
-          )
-        `)
+        .select("*")
         .order("donation_date", { ascending: false });
 
       if (error) throw error;
       
-      // Transform the data to match our Supporter interface
-      const transformedData = (data || []).map(item => ({
-        ...item,
-        profiles: item.profiles && typeof item.profiles === 'object' && !Array.isArray(item.profiles) && 'username' in item.profiles
-          ? item.profiles 
-          : null
-      }));
+      // Fetch user profiles separately for linked supporters
+      const supportersWithProfiles = await Promise.all(
+        (data || []).map(async (supporter) => {
+          if (supporter.user_id) {
+            const { data: profile } = await supabase
+              .from('profiles')
+              .select('username, email')
+              .eq('id', supporter.user_id)
+              .maybeSingle();
+            return { ...supporter, profiles: profile };
+          }
+          return { ...supporter, profiles: null };
+        })
+      );
       
-      setSupporters(transformedData as Supporter[]);
+      setSupporters(supportersWithProfiles);
     } catch (error) {
       console.error("Error fetching supporters:", error);
       toast({
